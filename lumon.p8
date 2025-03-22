@@ -189,26 +189,23 @@ function draw3d()
     local wall_height = 64 / d
     local y1 = 64 - wall_height / 2
     local y2 = 64 + wall_height / 2
-    local shade = 7 - flr((d / maxd) * 3)
-    shade = mid(shade, 4, 7)
-    rectfill(x, y1, x, y2, shade)
+
+    -- compute hit position
+    local hit_x = player.x + cos(ray_angle) * d
+    local hit_y = player.y + sin(ray_angle) * d
+    local frac_x = hit_x - flr(hit_x)
+    local frac_y = hit_y - flr(hit_y)
+
+    -- if hit near a grid corner (90° angle), outline with a grey column (color 6)
+    if (frac_x < 0.1 or frac_x > 0.9) and (frac_y < 0.1 or frac_y > 0.9) then
+      rectfill(x, y1, x, y2, 6)
+    else
+      local shade = 7 - flr((d / maxd) * 3)
+      shade = mid(shade, 4, 7)
+      rectfill(x, y1, x, y2, shade)
+    end
   end
 end
-
---[[function draw3d()
-  for x = 0, 127 do
-    local ray_angle = player.a - fov / 2 + (x / 127) * fov
-    local d = cast_ray(ray_angle)
-    local corrected_d = d * cos(ray_angle - player.a)
-    local wall_height = 64 / corrected_d
-    local y1 = 64 - wall_height / 2
-    local y2 = 64 + wall_height / 2
-    local shade = 7 - flr((corrected_d / maxd) * 3)
-    if shade < 4 then shade = 4 end
-    if shade > 7 then shade = 7 end
-    rectfill(x, y1, x, y2, shade)
-  end
-end]]
 
 -- cast a ray at angle 'a' and return distance until a wall is hit.
 function cast_ray(a)
@@ -273,21 +270,6 @@ function cast_ray(a)
   return min(dist, maxd)
 end
 
---[[function cast_ray(a)
-  local d = 0
-  while d < maxd do
-    local rx = player.x + cos(a) * d
-    local ry = player.y + sin(a) * d
-    local cx = flr(rx) + 1
-    local cy = flr(ry) + 1
-    if cx < 1 or cx > mwidth or cy < 1 or cy > mheight or maze[cy][cx] == 1 then
-      return d
-    end
-    d = d + step
-  end
-  return maxd
-end]]
-
 -- draw a simple minimap in the upper-left corner.
 function draw_minimap()
   local scale = 4
@@ -297,11 +279,16 @@ function draw_minimap()
       rectfill((x - 1) * scale, (y - 1) * scale, x * scale - 1, y * scale - 1, col)
     end
   end
-  -- mark department stops.
-  for i, dept in ipairs(dept_positions) do
-    local col = (i == current_dept) and 10 or 11
-    circfill((dept.x - 0.5) * scale, (dept.y - 0.5) * scale, 1, col)
+  -- mark only the next department stop on the minimap
+  local next_dept = dept_positions[current_dept + 1]
+  if next_dept then
+    circfill((next_dept.x - 0.5) * scale, (next_dept.y - 0.5) * scale, 1, 10)
   end
-  -- mark player position.
-  circfill(player.x * scale, player.y * scale, 1, 7)
+  -- mark player position and facing direction
+  local px = player.x * scale
+  local py = player.y * scale
+  circfill(px, py, 1, 7)
+  local dx = cos(player.a)
+  local dy = sin(player.a)
+  line(px, py, px + dx * 3, py + dy * 3, 7)
 end
