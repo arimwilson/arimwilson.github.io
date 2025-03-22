@@ -1,3 +1,6 @@
+pico-8 cartridge // http://www.pico-8.com
+version 42
+__lua__
 -- pico-8 3d maze game: severance hallways style
 -- objective: start at the elevator and visit in order:
 -- "optics and design", "mammalians nurturable", "wellness",
@@ -99,7 +102,7 @@ function _update()
     return
   end
 
-  local rot_speed = 0.08
+  local rot_speed = 0.04
   local move_speed = 0.1
   if btnp(4) then show_minimap = not show_minimap end
   if btnp(5) then
@@ -155,12 +158,12 @@ end
 function _draw()
   if game_state == "intro" then
     cls(0)
-    print("Severance Maze", 40, 20, 7)
-    print("Based on the TV show Severance", 10, 30, 7)
-    print("Objective: Visit all depts on", 10, 40, 7)
-    print("the Lumon severed floor and", 10, 50, 7)
+    print("severance maze", 40, 20, 7)
+    print("based on the tv show severance", 10, 30, 7)
+    print("objective: visit all depts on", 10, 40, 7)
+    print("the lumon severed floor and", 10, 50, 7)
     print("return to the elevator.", 10, 60, 7)
-    print("Press any key to start", 30, 70, 7)
+    print("press any key to start", 30, 70, 7)
     return
   end
 
@@ -174,7 +177,7 @@ function _draw()
   print(msg, 2, 2, 7)
   print("next: " .. (depts[current_dept + 1] or "none"), 2, 10, 3)
   if debug_mode then
-    print("DEBUG MODE", 2, 20, 8)
+    print("debug mode", 2, 20, 8)
     print("pos: " .. flr(player.x * 100) / 100 .. ", " .. flr(player.y * 100) / 100, 2, 28, 9)
     print("angle: " .. flr(player.a * 100) / 100, 2, 36, 9)
     print("dept: " .. current_dept, 2, 44, 9)
@@ -196,7 +199,7 @@ function draw3d()
     local frac_x = hit_x - flr(hit_x)
     local frac_y = hit_y - flr(hit_y)
 
-    -- if hit near a grid corner (90° angle), outline with a grey column (color 6)
+    -- if hit near a grid corner (90るぬ angle), outline with a grey column (color 6)
     if (frac_x < 0.1 or frac_x > 0.9) and (frac_y < 0.1 or frac_y > 0.9) then
       rectfill(x, y1, x, y2, 6)
     else
@@ -209,14 +212,14 @@ end
 
 -- cast a ray at angle 'a' and return distance until a wall is hit.
 function cast_ray(a)
-  -- Initial setup
+  -- initial setup
   local dir_x = cos(a)
   local dir_y = sin(a)
-  -- Map position to grid
+  -- map position to grid
   local map_x = flr(player.x)
   local map_y = flr(player.y)
 
-  -- Length of ray from one x or y side to next
+  -- length of ray from one x or y side to next
   local delta_dist_x = abs(1 / (dir_x == 0 and 0.00001 or dir_x))
   local delta_dist_y = abs(1 / (dir_y == 0 and 0.00001 or dir_y))
 
@@ -238,7 +241,7 @@ function cast_ray(a)
     side_dist_y = (map_y + 1 - player.y) * delta_dist_y
   end
 
-  -- DDA loop
+  -- dda loop
   local side
   while true do
     if side_dist_x < side_dist_y then
@@ -251,7 +254,7 @@ function cast_ray(a)
       side = 1
     end
 
-    -- Check if ray has hit a wall
+    -- check if ray has hit a wall
     if map_x < 1 or map_x > mwidth or map_y < 1 or map_y > mheight then
       return maxd
     elseif maze[map_y][map_x] == 1 then
@@ -259,7 +262,7 @@ function cast_ray(a)
     end
   end
 
-  -- Calculate distance
+  -- calculate distance
   local dist
   if side == 0 then
     dist = (map_x - player.x + (1 - step_x) / 2) / dir_x
@@ -292,3 +295,11 @@ function draw_minimap()
   local dy = sin(player.a)
   line(px, py, px + dx * 3, py + dy * 3, 7)
 end
+
+__gfx__
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00700700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00077000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00700700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
