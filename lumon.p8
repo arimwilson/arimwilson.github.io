@@ -159,9 +159,9 @@ function _draw()
   if game_state == "intro" then
     cls(0)
     print("severance maze", 40, 20, 7)
-    print("based on the tv show severance", 10, 30, 7)
-    print("objective: visit all depts on", 10, 40, 7)
-    print("the lumon severed floor and", 10, 50, 7)
+    print("based on the show severance", 10, 30, 7)
+    print("objective: visit all depts", 10, 40, 7)
+    print("on the lumon severed floor and", 10, 50, 7)
     print("return to the elevator.", 10, 60, 7)
     print("press any key to start", 30, 70, 7)
     return
