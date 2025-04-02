@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Simulator 9X</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles */
+        body {
+            font-family: 'Press Start 2P', cursive;
+            background-color: #2d2d2d; /* Dark gray background */
+            color: #0f0; /* Green text */
+            image-rendering: pixelated; /* Keep pixel art sharp */
+            overscroll-behavior: none; /* Prevent pull-to-refresh */
+        }
+        /* Style buttons with a retro feel */
+        .btn {
+            background-color: #555; /* Dark gray button */
+            color: #0f0; /* Green text */
+            border: 2px solid #0f0; /* Green border */
+            padding: 8px 16px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+            box-shadow: 4px 4px 0px #0a0; /* Green shadow */
+            margin: 5px; /* Add margin around buttons */
+            display: inline-block; /* Ensure buttons behave well */
+            text-align: center;
+        }
+        .btn:hover {
+            background-color: #777; /* Lighter gray on hover */
+            color: #fff; /* White text on hover */
+            box-shadow: 4px 4px 0px #0c0; /* Brighter green shadow */
+        }
+        .btn:active {
+            background-color: #444;
+            box-shadow: 2px 2px 0px #080; /* Smaller shadow when clicked */
+            transform: translate(2px, 2px); /* Button press effect */
+        }
+        /* Style for modal popups */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.6); /* Black background with opacity */
+            padding-top: 60px;
+            font-family: 'Press Start 2P', cursive; /* Ensure modal uses the font */
+        }
+        .modal-content {
+            background-color: #333; /* Dark background for modal */
+            margin: 5% auto;
+            padding: 20px;
+            border: 3px solid #0f0; /* Green border */
+            width: 80%;
+            max-width: 600px;
+            color: #0f0; /* Green text */
+            box-shadow: 8px 8px 0px #0a0;
+        }
+        .modal-content h2 {
+            margin-bottom: 15px;
+            border-bottom: 2px solid #0f0;
+            padding-bottom: 10px;
+        }
+        /* Style for the simulated text editor (now a textarea) */
+        .config-editor {
+            background-color: #111; /* Black background */
+            border: 2px solid #0f0;
+            padding: 10px;
+            height: 200px;
+            width: 100%; /* Make textarea fill container */
+            overflow-y: scroll;
+            white-space: pre; /* Preserve whitespace and line breaks */
+            font-family: monospace; /* Use monospace for config */
+            color: #0f0;
+            margin-bottom: 10px;
+            line-height: 1.2;
+            font-size: 0.9em; /* Slightly smaller font for config */
+            resize: none; /* Disable textarea resizing handle */
+            box-sizing: border-box; /* Include padding and border in element's total width and height */
+        }
+        /* Style for file lists */
+        .file-list {
+            background-color: #1a1a1a;
+            border: 2px solid #0f0;
+            padding: 10px;
+            height: 150px;
+            overflow-y: scroll;
+            margin-bottom: 10px;
+        }
+        .file-item {
+            cursor: pointer;
+            padding: 2px 5px;
+            margin-bottom: 2px;
+        }
+        .file-item:hover {
+            background-color: #444;
+        }
+        .file-item.selected {
+            background-color: #0a0;
+            color: #111;
+        }
+        /* Style for fake browser */
+        .browser-window {
+             background-color: #1a1a1a;
+             border: 2px solid #0f0;
+             padding: 10px;
+             height: 250px;
+             overflow-y: scroll;
+             margin-bottom: 10px;
+        }
+        .fake-site {
+            margin-bottom: 15px;
+            border-bottom: 1px dashed #555;
+            padding-bottom: 10px;
+        }
+        .fake-site h3 {
+             color: #ff0; /* Yellow for site titles */
+             margin-bottom: 5px;
+        }
+        .fake-link {
+            color: #0af; /* Blue for links */
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        .fake-link:hover {
+            color: #0cf;
+        }
+        .fake-ad {
+            background-color: #f00;
+            color: #fff;
+            padding: 10px;
+            margin: 10px 0;
+            text-align: center;
+            cursor: pointer;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            50% { opacity: 0.5; }
+        }
+        /* Simple progress bar */
+        .progress-bar-container {
+            width: 100%;
+            background-color: #555;
+            border: 1px solid #0f0;
+            height: 20px;
+            margin-top: 10px;
+        }
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #0f0;
+            text-align: center;
+            line-height: 20px;
+            color: #111;
+            font-size: 0.8em;
+            transition: width 0.5s ease-in-out;
+        }
+        /* Message Log */
+        #messageLog {
+            background-color: #111;
+            border: 2px solid #0f0;
+            padding: 10px;
+            height: 100px;
+            overflow-y: scroll;
+            margin-top: 15px;
+            font-size: 0.8em;
+            line-height: 1.4;
+        }
+        .message {
+            margin-bottom: 5px;
+        }
+        .message.error { color: #f00; }
+        .message.success { color: #0f0; }
+        .message.info { color: #aaa; }
+        .message.penalty { color: #ff0; font-weight: bold; }
+
+        /* Centering the main container */
+        .main-container {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            border: 3px solid #0f0;
+            background-color: #333;
+            box-shadow: 6px 6px 0px #0a0;
+        }
+
+        /* Task list styling */
+        #taskList li {
+            margin-bottom: 8px;
+            padding: 5px;
+            border: 1px dashed #555;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+         #taskList li:hover {
+             background-color: #444;
+         }
+        #taskList li.completed {
+            text-decoration: line-through;
+            color: #888;
+            cursor: default;
+            background-color: #2a2a2a;
+        }
+         #taskList li.active {
+             border: 1px solid #0f0;
+             background-color: #555;
+         }
+    </style>
+</head>
+<body class="p-4">
+
+    <div class="main-container">
+        <h1 class="text-3xl text-center mb-4">Setup Simulator 9X</h1>
+
+        <div class="flex justify-between items-center mb-4 p-2 border-2 border-[#0f0] bg-[#1a1a1a]">
+            <div>Score: <span id="score" class="text-xl">0</span></div>
+            <div>SD Card: <span id="sdCardUsage">0</span> / <span id="sdCardCapacity">64</span> MB</div>
+            </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="md:col-span-1 p-3 border-2 border-[#0f0] bg-[#1a1a1a]">
+                <h2 class="text-lg mb-2 border-b border-[#0f0] pb-1">Tasks:</h2>
+                <ul id="taskList">
+                    </ul>
+            </div>
+
+            <div class="md:col-span-2 p-3 border-2 border-[#0f0] bg-[#1a1a1a]">
+                <h2 class="text-lg mb-2 border-b border-[#0f0] pb-1">System Interface:</h2>
+                <div id="interactionArea">
+                    <p>Select a task to begin...</p>
+                    </div>
+                <div id="messageLog">
+                     <div class="message info">> System Booted. Waiting for command...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="configModal" class="modal">
+        <div class="modal-content">
+            <h2 id="configTaskTitle">Edit Configuration File</h2>
+            <p id="configTaskDesc" class="mb-2">Make the required changes.</p>
+            <textarea id="configEditor" class="config-editor">
+                </textarea>
+            <button id="saveConfigBtn" class="btn">Save Changes</button>
+            <button id="closeConfigBtn" class="btn">Cancel</button>
+             <div id="configErrorLog" class="text-[#f00] mt-2"></div>
+        </div>
+    </div>
+
+    <div id="romHuntModal" class="modal">
+        <div class="modal-content">
+             <h2 id="romHuntTaskTitle">Find ROM: <span id="romToFind"></span></h2>
+             <p id="romHuntTaskDesc" class="mb-2">Navigate the treacherous web...</p>
+             <div class="browser-window" id="browserWindow">
+                 </div>
+              <div id="downloadsList" class="mt-2">
+                  Downloads: <span id="currentDownloads"></span>
+              </div>
+             <button id="closeRomHuntBtn" class="btn">Close Browser</button>
+        </div>
+    </div>
+
+     <div id="sdManagerModal" class="modal">
+        <div class="modal-content">
+            <h2 id="sdManagerTaskTitle">Manage SD Card</h2>
+            <p id="sdManagerTaskDesc" class="mb-2">Copy required ROMs to the SD Card.</p>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <h3>Downloads</h3>
+                    <div id="downloadSourceList" class="file-list">
+                        </div>
+                </div>
+                <div>
+                    <h3>SD Card (<span id="sdUsageModal">0</span>/<span id="sdCapacityModal">64</span> MB)</h3>
+                    <div id="sdCardTargetList" class="file-list">
+                        </div>
+                </div>
+            </div>
+            <div id="sdProgressContainer" class="progress-bar-container mt-4" style="display: none;">
+                <div id="sdProgressBar" class="progress-bar">0%</div>
+            </div>
+            <div id="sdManagerButtons" class="mt-4">
+                 <button id="copyToSDBtn" class="btn" disabled>Copy Selected</button>
+                 <button id="formatSDBtn" class="btn text-[#f00]">Format SD</button>
+                 <button id="closeSdManagerBtn" class="btn">Done</button>
+            </div>
+             <div id="sdErrorLog" class="text-[#f00] mt-2"></div>
+        </div>
+    </div>
+
+    <div id="playPenaltyModal" class="modal">
+        <div class="modal-content text-center">
+            <h2 class="text-[#ff0]">!!! SETUP VIOLATION !!!</h2>
+            <p class="my-4 text-lg">You actually tried to PLAY the game?!?</p>
+            <p class="mb-4">This simulator is for SETUP PURISTS ONLY!</p>
+            <p class="text-xl text-[#f00] mb-4">-1000 POINTS!</p>
+            <button id="closePenaltyBtn" class="btn">I... Understand...</button>
+        </div>
+    </div>
+
+
+    <script>
+        // --- Game State ---
+        let score = 0;
+        let sdCardCapacity = 64; // MB
+        let sdCardUsage = 0;
+        let sdCardContents = {}; // Structure: { 'snes': [{name: 'rom1.smc', size: 2}], 'nes': [] }
+        let downloadedRoms = []; // Structure: [{name: 'rom1.smc', size: 2, system: 'snes'}]
+        let configFiles = { // Simulate different config files
+            'system.cfg': [
+                '# PixelDream Ultra Config v1.0',
+                'video_output=HDMI',
+                'resolution=640x480',
+                'aspect_ratio=4:3',
+                '#enable_scanlines=false',
+                'controller_primary=USB_Generic',
+                '#enable_cheats=false',
+                'sound_output=Stereo',
+                'network_enabled=false'
+            ],
+             'retroarch.cfg': [
+                 '# RetroArch Main Config',
+                 'menu_driver=rgui',
+                 'video_fullscreen=false',
+                 'input_player1_joypad_index=0',
+                 '# autosave_interval=600',
+                 'rewind_enable=false'
+             ]
+        };
+        let tasks = [];
+        let currentTask = null;
+        let selectedDownload = null;
+        let selectedSDFile = null; // Could be used for delete later
+
+        // --- DOM Elements ---
+        const scoreEl = document.getElementById('score');
+        const sdUsageEl = document.getElementById('sdCardUsage');
+        const sdCapacityEl = document.getElementById('sdCardCapacity');
+        const taskListEl = document.getElementById('taskList');
+        const interactionAreaEl = document.getElementById('interactionArea');
+        const messageLogEl = document.getElementById('messageLog');
+
+        // Modals
+        const configModal = document.getElementById('configModal');
+        const romHuntModal = document.getElementById('romHuntModal');
+        const sdManagerModal = document.getElementById('sdManagerModal');
+        const playPenaltyModal = document.getElementById('playPenaltyModal');
+
+        // Config Modal Elements
+        const configTaskTitleEl = document.getElementById('configTaskTitle');
+        const configTaskDescEl = document.getElementById('configTaskDesc');
+        const configEditorEl = document.getElementById('configEditor'); // Now references a <textarea>
+        const saveConfigBtn = document.getElementById('saveConfigBtn');
+        const closeConfigBtn = document.getElementById('closeConfigBtn');
+        const configErrorLogEl = document.getElementById('configErrorLog');
+
+        // ROM Hunt Modal Elements
+        const romHuntTaskTitleEl = document.getElementById('romHuntTaskTitle');
+        const romHuntTaskDescEl = document.getElementById('romHuntTaskDesc');
+        const romToFindEl = document.getElementById('romToFind');
+        const browserWindowEl = document.getElementById('browserWindow');
+        const downloadsListEl = document.getElementById('currentDownloads');
+        const closeRomHuntBtn = document.getElementById('closeRomHuntBtn');
+
+        // SD Manager Modal Elements
+        const sdManagerTaskTitleEl = document.getElementById('sdManagerTaskTitle');
+        const sdManagerTaskDescEl = document.getElementById('sdManagerTaskDesc');
+        const downloadSourceListEl = document.getElementById('downloadSourceList');
+        const sdCardTargetListEl = document.getElementById('sdCardTargetList');
+        const sdUsageModalEl = document.getElementById('sdUsageModal');
+        const sdCapacityModalEl = document.getElementById('sdCapacityModal');
+        const copyToSDBtn = document.getElementById('copyToSDBtn');
+        const formatSDBtn = document.getElementById('formatSDBtn');
+        const closeSdManagerBtn = document.getElementById('closeSdManagerBtn');
+        const sdProgressContainer = document.getElementById('sdProgressContainer');
+        const sdProgressBar = document.getElementById('sdProgressBar');
+        const sdErrorLogEl = document.getElementById('sdErrorLog');
+
+        // Penalty Modal Elements
+        const closePenaltyBtn = document.getElementById('closePenaltyBtn');
+
+
+        // --- Utility Functions ---
+        function updateScore(change) {
+            score += change;
+            scoreEl.textContent = score;
+            if (change > 0) {
+                 logMessage(`+${change} points!`, 'success');
+            } else if (change < 0) {
+                 logMessage(`${change} points!`, 'error');
+            }
+        }
+
+        function updateSDCardUsage() {
+            sdCardUsage = 0;
+            for (const system in sdCardContents) {
+                sdCardContents[system].forEach(rom => sdCardUsage += rom.size);
+            }
+            sdUsageEl.textContent = sdCardUsage;
+            sdUsageModalEl.textContent = sdCardUsage; // Update modal usage too
+            sdCapacityEl.textContent = sdCardCapacity;
+            sdCapacityModalEl.textContent = sdCardCapacity; // Update modal capacity too
+        }
+
+         function logMessage(msg, type = 'info') {
+             const messageDiv = document.createElement('div');
+             messageDiv.classList.add('message', type);
+             messageDiv.textContent = `> ${msg}`;
+             messageLogEl.appendChild(messageDiv);
+             // Auto-scroll to bottom
+             messageLogEl.scrollTop = messageLogEl.scrollHeight;
+         }
+
+        function showModal(modalElement) {
+            modalElement.style.display = 'block';
+        }
+
+        function hideModal(modalElement) {
+            modalElement.style.display = 'none';
+            // Clear any specific modal error messages when closing
+             if (modalElement === configModal) configErrorLogEl.textContent = '';
+             if (modalElement === sdManagerModal) sdErrorLogEl.textContent = '';
+             // Deselect active task visually when closing its modal
+             if (currentTask) {
+                 const taskLi = document.getElementById(`task-${currentTask.id}`);
+                 if (taskLi) taskLi.classList.remove('active');
+             }
+             // currentTask = null; // Deselect task logic handled by completion/closing
+        }
+
+        function simulateProgress(duration, callback) {
+            sdProgressContainer.style.display = 'block';
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 10;
+                sdProgressBar.style.width = `${progress}%`;
+                sdProgressBar.textContent = `${progress}%`;
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    sdProgressContainer.style.display = 'none';
+                    sdProgressBar.style.width = '0%';
+                    sdProgressBar.textContent = '0%';
+                    if (callback) callback();
+                }
+            }, duration / 10);
+        }
+
+        // --- Task Definitions ---
+        function defineTasks() {
+            tasks = [
+                 { id: 1, description: "Enable Scanlines in system.cfg", type: 'config', file: 'system.cfg', targetLine: 5, change: 'enable_scanlines=true', points: 50, completed: false }, // Line number adjusted for 0-based index + comment line
+                 { id: 2, description: "Set Resolution to 800x600 in system.cfg", type: 'config', file: 'system.cfg', targetLine: 3, change: 'resolution=800x600', points: 50, completed: false }, // Line number adjusted
+                 { id: 3, description: "Find Chrono Trigger ROM (SNES)", type: 'rom_hunt', romName: 'Chrono Trigger', system: 'snes', size: 4, points: 100, completed: false },
+                 { id: 4, description: "Find Super Mario Bros. ROM (NES)", type: 'rom_hunt', romName: 'Super Mario Bros.', system: 'nes', size: 1, points: 75, completed: false },
+                 { id: 5, description: "Copy Chrono Trigger to SD Card (SNES folder)", type: 'sd_manage', romName: 'Chrono Trigger', targetSystem: 'snes', points: 75, completed: false, requires: [3] }, // Requires task 3 (finding it)
+                 { id: 6, description: "Copy Super Mario Bros. to SD Card (NES folder)", type: 'sd_manage', romName: 'Super Mario Bros.', targetSystem: 'nes', points: 50, completed: false, requires: [4] }, // Requires task 4
+                 { id: 7, description: "Enable Rewind in retroarch.cfg", type: 'config', file: 'retroarch.cfg', targetLine: 6, change: 'rewind_enable=true', points: 60, completed: false }, // Line number adjusted
+                 { id: 8, description: "Find Sonic the Hedgehog ROM (Genesis)", type: 'rom_hunt', romName: 'Sonic the Hedgehog', system: 'genesis', size: 1, points: 75, completed: false },
+                 { id: 9, description: "Copy Sonic to SD Card (Genesis folder)", type: 'sd_manage', romName: 'Sonic the Hedgehog', targetSystem: 'genesis', points: 50, completed: false, requires: [8]},
+                 { id: 10, description: "Format the SD Card (Warning: Deletes all ROMs!)", type: 'sd_format', points: -50, completed: false }, // Negative points task!
+            ];
+            renderTaskList();
+        }
+
+        // --- Task Handling ---
+        function renderTaskList() {
+            taskListEl.innerHTML = ''; // Clear existing list
+            tasks.forEach(task => {
+                const li = document.createElement('li');
+                li.id = `task-${task.id}`;
+                li.textContent = task.description;
+                if (task.completed) {
+                    li.classList.add('completed');
+                } else {
+                    // Check prerequisites
+                    let prereqsMet = true;
+                    if (task.requires) {
+                        prereqsMet = task.requires.every(reqId => {
+                            const prereqTask = tasks.find(t => t.id === reqId);
+                            return prereqTask && prereqTask.completed;
+                        });
+                    }
+
+                    if (prereqsMet) {
+                        li.onclick = () => selectTask(task);
+                    } else {
+                        li.style.color = '#888'; // Grey out unmet prerequisites
+                        li.style.cursor = 'not-allowed';
+                        li.title = "Prerequisites not met";
+                    }
+                }
+                taskListEl.appendChild(li);
+            });
+        }
+
+        function selectTask(task) {
+            if (task.completed) return;
+
+             // Deselect previous active task visually
+             if (currentTask) {
+                 const prevTaskLi = document.getElementById(`task-${currentTask.id}`);
+                 if (prevTaskLi) prevTaskLi.classList.remove('active');
+             }
+
+            currentTask = task;
+             logMessage(`Selected task: ${task.description}`, 'info');
+
+             // Highlight selected task
+             const taskLi = document.getElementById(`task-${task.id}`);
+             if (taskLi) taskLi.classList.add('active');
+
+
+            // Launch the appropriate minigame/modal
+            if (task.type === 'config') {
+                startConfigTask(task);
+            } else if (task.type === 'rom_hunt') {
+                startRomHuntTask(task);
+            } else if (task.type === 'sd_manage') {
+                 startSDManagerTask(task);
+            } else if (task.type === 'sd_format') {
+                 startSDManagerTask(task); // Use SD manager for format too
+            }
+        }
+
+        function completeTask(task) {
+            if (!task || task.completed) return;
+            task.completed = true;
+            updateScore(task.points);
+            logMessage(`Task Completed: ${task.description}`, 'success');
+            currentTask = null; // Deselect task after completion
+            renderTaskList(); // Re-render to show completion and unlock next tasks
+            checkWinCondition();
+        }
+
+         function checkWinCondition() {
+             const allTasksDone = tasks.every(task => task.completed || task.points < 0); // Ignore negative point tasks for win condition
+             if (allTasksDone) {
+                 logMessage("ALL TASKS COMPLETE! YOU ARE A SETUP MASTER!", "success");
+                 alert("Congratulations! You've completed all setup tasks! You win!"); // Simple win alert for now
+             }
+         }
+
+        // --- Config Minigame ---
+        function startConfigTask(task) {
+            configTaskTitleEl.textContent = `Edit: ${task.file}`;
+            configTaskDescEl.textContent = task.description;
+            configErrorLogEl.textContent = ''; // Clear previous errors
+
+            // Load config content - Create a *copy* for editing
+            const currentConfig = [...configFiles[task.file]]; // Shallow copy lines
+            // **** CHANGED textContent TO value ****
+            configEditorEl.value = currentConfig.join('\n'); // Display in textarea
+
+            saveConfigBtn.onclick = () => {
+                // Get the edited content
+                // **** CHANGED textContent TO value ****
+                const editedLines = configEditorEl.value.split('\n');
+                // Basic validation: Check if the target line matches the required change
+                const targetLineIndex = task.targetLine -1; // Adjust for 0-based index
+
+                // Trim whitespace for comparison
+                const editedLineTrimmed = editedLines[targetLineIndex]?.trim();
+                const requiredChangeTrimmed = task.change.trim();
+
+                if (editedLineTrimmed === requiredChangeTrimmed) {
+                    // Success! Update the actual config file state
+                    configFiles[task.file] = editedLines;
+                    logMessage(`Config ${task.file} saved successfully.`, 'success');
+                    completeTask(task);
+                    hideModal(configModal);
+                } else {
+                    // Provide more specific error feedback
+                    let errorMsg = `Error: Line ${task.targetLine} modification incorrect.`;
+                    if (editedLines[targetLineIndex] !== undefined) {
+                         errorMsg += ` Expected something like "${task.change}", found "${editedLines[targetLineIndex]}".`;
+                    } else {
+                        errorMsg += ` Expected something like "${task.change}", but line ${task.targetLine} seems missing or empty.`;
+                    }
+                     configErrorLogEl.textContent = errorMsg;
+                    updateScore(-10); // Penalty for wrong config
+                    logMessage(`Config save failed for ${task.file}.`, 'error');
+                }
+            };
+
+            closeConfigBtn.onclick = () => {
+                hideModal(configModal);
+                // Deselect task visually if cancelled
+                 const taskLi = document.getElementById(`task-${task.id}`);
+                 if (taskLi) taskLi.classList.remove('active');
+                 currentTask = null;
+            }
+
+            showModal(configModal);
+        }
+
+
+        // --- ROM Hunt Minigame ---
+        function startRomHuntTask(task) {
+            romHuntTaskTitleEl.textContent = `Find ROM: ${task.romName}`;
+            romHuntTaskDescEl.textContent = `Search the archives for ${task.romName} (${task.system.toUpperCase()})...`;
+            romToFindEl.textContent = task.romName;
+            downloadsListEl.textContent = downloadedRoms.map(r => r.name).join(', '); // Show current downloads
+            renderFakeWebsites(task); // Populate browser window
+            showModal(romHuntModal);
+
+             closeRomHuntBtn.onclick = () => {
+                 hideModal(romHuntModal);
+                 // Deselect task visually if cancelled
+                 const taskLi = document.getElementById(`task-${task.id}`);
+                 if (taskLi) taskLi.classList.remove('active');
+                 currentTask = null;
+             }
+        }
+
+        function renderFakeWebsites(task) {
+            browserWindowEl.innerHTML = ''; // Clear previous content
+            const sites = [
+                { name: "ROMz R Gr8", dodgy: false },
+                { name: "Pixel Pirate Cove", dodgy: true },
+                { name: "GeoCities Gamer Zone", dodgy: false },
+                { name: "LeEt HaXoR Warez", dodgy: true },
+            ];
+
+            sites.forEach(site => {
+                const siteDiv = document.createElement('div');
+                siteDiv.classList.add('fake-site');
+                siteDiv.innerHTML = `<h3>${site.name}</h3>`;
+
+                // Add some fake links and maybe the target ROM link
+                const linkCount = Math.floor(Math.random() * 3) + 1;
+                let foundLink = false;
+                for (let i = 0; i < linkCount; i++) {
+                    const p = document.createElement('p');
+                    const link = document.createElement('span');
+                    link.classList.add('fake-link');
+
+                    // Make finding the actual ROM a bit more likely on non-dodgy sites
+                    if (!site.dodgy && Math.random() < 0.6 && !foundLink) {
+                         link.textContent = `${task.romName}.${task.system === 'nes' ? 'nes' : task.system === 'snes' ? 'smc' : 'gen'}`; // Simple extension guess
+                         link.onclick = () => downloadRom(task);
+                         foundLink = true;
+                    } else {
+                        link.textContent = `Some_Other_Game_${i+1}.zip`;
+                        link.onclick = () => clickFakeLink();
+                    }
+                    p.appendChild(link);
+                    siteDiv.appendChild(p);
+                }
+
+                 // Add a fake ad sometimes, especially on dodgy sites
+                 if (site.dodgy || Math.random() < 0.4) {
+                     const ad = document.createElement('div');
+                     ad.classList.add('fake-ad');
+                     ad.textContent = '!!! CLICK HERE FOR FREE SMILEYS !!!';
+                     ad.onclick = () => clickFakeAd();
+                     siteDiv.appendChild(ad);
+                 }
+
+                browserWindowEl.appendChild(siteDiv);
+            });
+        }
+
+        function clickFakeLink() {
+            logMessage("Downloaded 'useless_file.zip'... waste of time.", "error");
+            updateScore(-5);
+        }
+
+        function clickFakeAd() {
+            logMessage("Popup Ad blocked! Annoying!", "error");
+            updateScore(-2);
+        }
+
+        function downloadRom(task) {
+             // Check if already downloaded
+             if (downloadedRoms.some(rom => rom.name === task.romName)) {
+                 logMessage(`${task.romName} is already downloaded.`, 'info');
+                 // Still complete task if they click download again for an existing ROM needed for the task
+                 if(currentTask && currentTask.type === 'rom_hunt' && currentTask.romName === task.romName && !currentTask.completed) {
+                    completeTask(currentTask);
+                 }
+                 hideModal(romHuntModal);
+                 return;
+             }
+
+             logMessage(`Downloading ${task.romName}...`, 'info');
+             simulateProgress(1500, () => { // Simulate download time
+                 logMessage(`Downloaded ${task.romName} (${task.size}MB)!`, 'success');
+                 downloadedRoms.push({ name: task.romName, size: task.size, system: task.system });
+                 downloadsListEl.textContent = downloadedRoms.map(r => r.name).join(', '); // Update list in modal
+                 completeTask(task);
+                 hideModal(romHuntModal); // Close after successful download
+             });
+        }
+
+        // --- SD Card Manager Minigame ---
+         function startSDManagerTask(task) {
+             sdManagerTaskTitleEl.textContent = task.description;
+             sdManagerTaskDescEl.textContent = task.type === 'sd_format' ? "WARNING: This will erase all data!" : "Select a ROM from Downloads to copy.";
+             sdErrorLogEl.textContent = ''; // Clear errors
+             selectedDownload = null; // Reset selection
+             copyToSDBtn.disabled = true; // Disable button initially
+
+             renderDownloadList();
+             renderSDCardList();
+             updateSDCardUsage(); // Ensure modal shows correct usage
+
+             // Special handling for format task
+             if (task.type === 'sd_format') {
+                 copyToSDBtn.style.display = 'none'; // Hide copy button
+                 formatSDBtn.style.display = 'inline-block'; // Show format button
+                 formatSDBtn.onclick = () => formatSDCard(task);
+             } else {
+                 copyToSDBtn.style.display = 'inline-block'; // Show copy button
+                 formatSDBtn.style.display = 'inline-block'; // Keep format button visible
+                 copyToSDBtn.onclick = () => copySelectedRomToSD(task);
+                 formatSDBtn.onclick = () => formatSDCard(null); // Allow formatting outside of task
+             }
+
+
+             closeSdManagerBtn.onclick = () => {
+                 hideModal(sdManagerModal);
+                 // Deselect task visually if cancelled
+                 const taskLi = document.getElementById(`task-${task.id}`);
+                 if (taskLi) taskLi.classList.remove('active');
+                 currentTask = null;
+             }
+
+             showModal(sdManagerModal);
+         }
+
+         function renderDownloadList() {
+             downloadSourceListEl.innerHTML = '';
+             if (downloadedRoms.length === 0) {
+                 downloadSourceListEl.innerHTML = '<p class="text-[#aaa]">No ROMs downloaded yet.</p>';
+                 return;
+             }
+             downloadedRoms.forEach(rom => {
+                 const div = document.createElement('div');
+                 div.classList.add('file-item');
+                 div.textContent = `${rom.name} (${rom.size}MB)`;
+                 div.dataset.romName = rom.name; // Store name for identification
+                 div.onclick = () => selectRomForCopy(rom, div);
+                 downloadSourceListEl.appendChild(div);
+             });
+         }
+
+         function renderSDCardList() {
+             sdCardTargetListEl.innerHTML = '';
+             let hasContent = false;
+             // Create folders first
+             const systems = new Set(Object.keys(sdCardContents).concat(tasks.map(t => t.targetSystem).filter(Boolean))); // Show potential folders too
+             systems.forEach(system => {
+                 if (!system) return; // Skip if targetSystem is null/undefined
+                 const folderDiv = document.createElement('div');
+                 folderDiv.textContent = `[${system.toUpperCase()}]/`;
+                 folderDiv.style.fontWeight = 'bold';
+                 folderDiv.style.marginBottom = '5px';
+                 sdCardTargetListEl.appendChild(folderDiv);
+                 hasContent = true; // At least a folder exists
+
+                 // List files inside the folder
+                 if (sdCardContents[system]) {
+                     sdCardContents[system].forEach(rom => {
+                         const fileDiv = document.createElement('div');
+                         fileDiv.classList.add('file-item');
+                         fileDiv.style.marginLeft = '15px'; // Indent files
+                         // Create text node for file name and size first
+                         const fileText = document.createTextNode(`${rom.name} (${rom.size}MB) `);
+                         fileDiv.appendChild(fileText);
+
+
+                         // Add a "PLAY" button - THE FORBIDDEN BUTTON!
+                         const playBtn = document.createElement('button');
+                         playBtn.textContent = 'PLAY';
+                         playBtn.classList.add('btn');
+                         playBtn.style.marginLeft = '10px';
+                         playBtn.style.padding = '2px 4px';
+                         playBtn.style.fontSize = '0.7em';
+                         playBtn.style.boxShadow = '2px 2px 0px #f00'; // Red shadow for danger
+                         playBtn.onclick = (e) => {
+                             e.stopPropagation(); // Prevent triggering file selection
+                             triggerPlayPenalty();
+                         };
+                         fileDiv.appendChild(playBtn);
+
+                         sdCardTargetListEl.appendChild(fileDiv);
+                     });
+                 }
+             });
+             if (!hasContent) {
+                 sdCardTargetListEl.innerHTML = '<p class="text-[#aaa]">SD Card is empty.</p>';
+             }
+         }
+
+
+         function selectRomForCopy(rom, element) {
+             selectedDownload = rom;
+             // Highlight selection visually
+             const items = downloadSourceListEl.querySelectorAll('.file-item');
+             items.forEach(item => item.classList.remove('selected'));
+             element.classList.add('selected');
+             copyToSDBtn.disabled = false; // Enable copy button
+             sdErrorLogEl.textContent = ''; // Clear errors
+         }
+
+         function copySelectedRomToSD(task) {
+             if (!selectedDownload) {
+                 sdErrorLogEl.textContent = "Error: No ROM selected from Downloads.";
+                 return;
+             }
+
+             // Determine the target system folder
+             // If it's an sd_manage task, use its targetSystem. Otherwise, use the ROM's inherent system.
+             const targetSystem = (task && task.type === 'sd_manage') ? task.targetSystem : selectedDownload.system;
+
+             if (!targetSystem) {
+                 sdErrorLogEl.textContent = "Error: Cannot determine target system folder for this ROM.";
+                 logMessage(`Error copying ${selectedDownload.name}: Unknown system.`, 'error');
+                 return;
+             }
+
+             // Check if the selected ROM is the one required by the current sd_manage task (if applicable)
+             if (task && task.type === 'sd_manage' && selectedDownload.name !== task.romName) {
+                  sdErrorLogEl.textContent = `Error: Task requires copying ${task.romName}. You selected ${selectedDownload.name}.`;
+                  updateScore(-10);
+                  return;
+             }
+
+
+             // Check SD card space
+             if (sdCardUsage + selectedDownload.size > sdCardCapacity) {
+                 sdErrorLogEl.textContent = "Error: Not enough space on SD Card!";
+                 logMessage("SD Card full!", "error");
+                 updateScore(-15);
+                 return;
+             }
+
+             // Check if file already exists on SD card in that folder
+              if (sdCardContents[targetSystem] && sdCardContents[targetSystem].some(r => r.name === selectedDownload.name)) {
+                  sdErrorLogEl.textContent = `Error: ${selectedDownload.name} already exists in ${targetSystem.toUpperCase()} folder.`;
+                  logMessage(`${selectedDownload.name} already on SD card.`, 'info');
+                  // If this was the required ROM for the task, complete the task anyway
+                  if (task && task.type === 'sd_manage' && selectedDownload.name === task.romName && !task.completed) {
+                      completeTask(task);
+                  }
+                  return; // Don't copy duplicates
+              }
+
+
+             logMessage(`Copying ${selectedDownload.name} to SD Card (${targetSystem.toUpperCase()} folder)...`, 'info');
+             copyToSDBtn.disabled = true; // Disable while copying
+
+             simulateProgress(2000, () => { // Simulate copy time
+                 // Add to SD card contents
+                 if (!sdCardContents[targetSystem]) {
+                     sdCardContents[targetSystem] = []; // Create system folder if it doesn't exist
+                 }
+                 // Make sure not to push duplicates if logic failed earlier
+                 if (!sdCardContents[targetSystem].some(r => r.name === selectedDownload.name)) {
+                    sdCardContents[targetSystem].push({...selectedDownload}); // Push a copy
+                 }
+
+
+                 // Update usage and UI
+                 updateSDCardUsage();
+                 renderSDCardList(); // Re-render SD card view
+                 logMessage(`Copied ${selectedDownload.name} successfully.`, 'success');
+                 copyToSDBtn.disabled = false; // Re-enable button
+
+                 // Complete the task if it was the correct ROM for the task
+                 if (task && task.type === 'sd_manage' && selectedDownload.name === task.romName && !task.completed) {
+                     completeTask(task);
+                     // Optionally close modal on task completion, or let user do more
+                     // hideModal(sdManagerModal);
+                 }
+
+                 // Deselect after copy
+                 selectedDownload = null;
+                 const items = downloadSourceListEl.querySelectorAll('.file-item');
+                 items.forEach(item => item.classList.remove('selected'));
+                 copyToSDBtn.disabled = true; // Disable button again until new selection
+             });
+         }
+
+         function formatSDCard(task) {
+             if (confirm("WARNING: Formatting will erase ALL data from the SD Card. Continue?")) {
+                 logMessage("Formatting SD Card...", "info");
+                 simulateProgress(1000, () => {
+                     sdCardContents = {}; // Wipe the contents
+                     sdCardUsage = 0;
+                     updateSDCardUsage();
+                     renderSDCardList();
+                     logMessage("SD Card Formatted.", "success");
+                     if (task && task.type === 'sd_format') {
+                         completeTask(task); // Complete the format task (even if points are negative)
+                         // hideModal(sdManagerModal);
+                     } else {
+                         updateScore(-25); // Penalty for formatting outside of task
+                         logMessage("Formatted SD Card unnecessarily.", "error");
+                     }
+                 });
+             }
+         }
+
+        // --- The Forbidden Action ---
+        function triggerPlayPenalty() {
+            logMessage("!!! ATTEMPTED TO PLAY A GAME !!!", "penalty");
+            updateScore(-1000); // Ouch!
+            showModal(playPenaltyModal);
+        }
+
+        closePenaltyBtn.onclick = () => hideModal(playPenaltyModal);
+
+
+        // --- Initialization ---
+        function initGame() {
+            score = 0;
+            sdCardUsage = 0;
+            sdCardContents = {};
+            downloadedRoms = [];
+            // Reset config files to initial state using the stored copy
+            configFiles = JSON.parse(JSON.stringify(initialConfigFiles));
+            tasks = [];
+            currentTask = null;
+            selectedDownload = null;
+
+            defineTasks(); // Define and render tasks
+            updateScore(0); // Update display
+            updateSDCardUsage(); // Update display
+            logMessage("Setup Simulator 9X Initialized. Good luck!", "info");
+        }
+
+        // Store initial state for reset - Ensure this runs *before* initGame might modify it
+         const initialConfigFiles = JSON.parse(JSON.stringify(configFiles));
+
+        // --- Start Game ---
+        document.addEventListener('DOMContentLoaded', initGame);
+
+    </script>
+
+</body>
+</html>
