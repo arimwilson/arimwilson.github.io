@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Ariana's Jumping Bunnies</title>
+    <style>
+        /* Basic styling for the game page */
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+            background-color: #5c94fc; /* A pleasant sky blue */
+            font-family: 'Arial', sans-serif;
+            color: #fff;
+            overflow: hidden; /* Prevent scrollbars */
+            -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+        }
+
+        /* Logo Overlay Styles */
+        #logo-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #5c94fc; /* Match body background for seamless feel */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000; /* High z-index to be on top */
+            opacity: 1;
+            transition: opacity 1s ease-out; /* 1-second fade-out */
+        }
+
+        #logo-overlay img {
+            max-width: 70%;
+            max-height: 70%;
+            border-radius: 10px; /* Optional: if your logo looks good with rounded corners */
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2); /* Optional: subtle shadow */
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        canvas {
+            border: 2px solid #000;
+            background-color: #78c0ff; /* Lighter blue for the game background */
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            border-radius: 8px; 
+            max-width: 100%;
+            max-height: 75%; 
+            object-fit: contain; 
+        }
+
+        .game-info { 
+            margin-top: 10px;
+            margin-bottom: 10px;
+            padding: 8px 15px;
+            background-color: rgba(0, 0, 0, 0.6); 
+            border-radius: 8px;
+            font-size: clamp(0.7rem, 2.5vw, 0.9rem); 
+            text-align: center;
+            min-width: 280px; 
+            max-width: 90%;
+        }
+        .game-info p {
+            margin: 5px 0;
+        }
+        .game-info strong {
+            color: #FFD700; 
+        }
+
+        .touch-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 400px; 
+            padding: 10px 0; 
+            margin-top: auto; 
+            user-select: none; 
+            -webkit-user-select: none;
+        }
+
+        .touch-controls .move-controls {
+            display: flex;
+            gap: 20px; 
+        }
+
+        .touch-controls button {
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.7);
+            border-radius: 50%; 
+            width: clamp(60px, 15vw, 80px); 
+            height: clamp(60px, 15vw, 80px);
+            font-size: clamp(1.2rem, 5vw, 1.8rem); 
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            transition: background-color 0.1s, transform 0.1s;
+        }
+        .touch-controls button:active {
+            background-color: rgba(0, 0, 0, 0.7);
+            transform: scale(0.95);
+        }
+
+        @media (min-width: 769px) {
+            /* Touch controls could be hidden on desktop, but kept for testing */
+        }
+
+    </style>
+</head>
+<body>
+    <div id="logo-overlay">
+        <img src="https://arimwilson.github.io/jumpingbunnies.png" alt="Ariana's Jumping Bunnies Logo">
+    </div>
+
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div class="game-info">
+            <p><strong>Ariana's Jumping Bunnies</strong></p>
+            <p>Controls: Arrow Keys/Space OR Touch Buttons</p>
+            <p id="level-display">Current Level: 1</p>
+            <p id="carrot-count">Carrots Remaining: 0</p>
+        </div>
+        <div class="touch-controls">
+            <div class="move-controls">
+                <button id="touch-left">&#x2190;</button> <button id="touch-right">&#x2192;</button> </div>
+            <button id="touch-jump">&#x2191;</button> </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const carrotCountDisplay = document.getElementById('carrot-count');
+        const levelDisplay = document.getElementById('level-display');
+        const gameContainer = document.querySelector('.game-container');
+        const logoOverlay = document.getElementById('logo-overlay'); // Get the logo overlay element
+
+        const GAME_WIDTH = 640; 
+        const GAME_HEIGHT = 480;
+        canvas.width = GAME_WIDTH;
+        canvas.height = GAME_HEIGHT;
+
+        let gameWon = false; 
+        let currentLevel = 0; 
+        let levelTransitioning = false; 
+
+        const player = {
+            width: 30, height: 45, headRadius: 15, earWidth: 8, earHeight: 20, 
+            startX: 50, x: 50, y: GAME_HEIGHT - 40 - 45, 
+            speed: 4, velocityX: 0, velocityY: 0, jumpStrength: 13, gravity: 0.6,
+            onGround: false, isJumping: false, 
+            color: '#FFDBAC', outlineColor: '#A0522D', innerEarColor: '#F5C0C0', 
+            eyeColor: '#000000', noseColor: '#FF69B4', facing: 'right'
+        };
+
+        let platforms = []; 
+        const carrotProps = {
+            width: 15, height: 25, color: '#FFA500', 
+            outlineColor: '#A0522D', leafColor: '#008000' 
+        };
+        let carrots = []; 
+        let carrotsRemaining = 0;
+
+        const keys = { ArrowLeft: false, ArrowRight: false, Space: false };
+
+        function resizeCanvasAndLayout() {
+            const aspectRatio = GAME_WIDTH / GAME_HEIGHT;
+            const containerWidth = gameContainer.clientWidth;
+            const containerHeight = gameContainer.clientHeight; 
+            const gameInfoEl = document.querySelector('.game-info');
+            const touchControlsEl = document.querySelector('.touch-controls');
+            let availableHeightForCanvas = containerHeight;
+            if (gameInfoEl) availableHeightForCanvas -= (gameInfoEl.offsetHeight + parseInt(getComputedStyle(gameInfoEl).marginTop) + parseInt(getComputedStyle(gameInfoEl).marginBottom));
+            if (touchControlsEl && getComputedStyle(touchControlsEl).display !== 'none') { 
+                 availableHeightForCanvas -= (touchControlsEl.offsetHeight + parseInt(getComputedStyle(touchControlsEl).paddingTop) + parseInt(getComputedStyle(touchControlsEl).paddingBottom));
+            }
+            availableHeightForCanvas = Math.max(150, availableHeightForCanvas); 
+            let newCanvasWidth = containerWidth;
+            let newCanvasHeight = newCanvasWidth / aspectRatio;
+            if (newCanvasHeight > availableHeightForCanvas) {
+                newCanvasHeight = availableHeightForCanvas;
+                newCanvasWidth = newCanvasHeight * aspectRatio;
+            }
+            if (newCanvasWidth > containerWidth) {
+                newCanvasWidth = containerWidth;
+                newCanvasHeight = newCanvasWidth / aspectRatio;
+            }
+            canvas.style.width = `${newCanvasWidth}px`;
+            canvas.style.height = `${newCanvasHeight}px`;
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (levelTransitioning) return; 
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault(); 
+                if (e.key === ' ') keys.Space = true;
+                else keys[e.key] = true;
+            }
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault();
+                if (e.key === ' ') keys.Space = false;
+                else keys[e.key] = false;
+            }
+        });
+
+        const touchLeftButton = document.getElementById('touch-left');
+        const touchRightButton = document.getElementById('touch-right');
+        const touchJumpButton = document.getElementById('touch-jump');
+        function handleTouchStart(e, keyName) {
+            e.preventDefault();
+            if (levelTransitioning) return;
+            keys[keyName] = true;
+        }
+        function handleTouchEnd(e, keyName) {
+            e.preventDefault();
+            keys[keyName] = false;
+        }
+        if (touchLeftButton && touchRightButton && touchJumpButton) {
+            touchLeftButton.addEventListener('touchstart', (e) => handleTouchStart(e, 'ArrowLeft'), { passive: false });
+            touchLeftButton.addEventListener('touchend', (e) => handleTouchEnd(e, 'ArrowLeft'), { passive: false });
+            touchLeftButton.addEventListener('touchcancel', (e) => handleTouchEnd(e, 'ArrowLeft'), { passive: false });
+            touchRightButton.addEventListener('touchstart', (e) => handleTouchStart(e, 'ArrowRight'), { passive: false });
+            touchRightButton.addEventListener('touchend', (e) => handleTouchEnd(e, 'ArrowRight'), { passive: false });
+            touchRightButton.addEventListener('touchcancel', (e) => handleTouchEnd(e, 'ArrowRight'), { passive: false });
+            touchJumpButton.addEventListener('touchstart', (e) => handleTouchStart(e, 'Space'), { passive: false });
+            touchJumpButton.addEventListener('touchend', (e) => handleTouchEnd(e, 'Space'), { passive: false });
+            touchJumpButton.addEventListener('touchcancel', (e) => handleTouchEnd(e, 'Space'), { passive: false });
+        }
+        
+        function generateLevel() { // Keep your existing robust generateLevel function
+            platforms = []; carrots = [];   
+            const groundPlatformHeight = 40;
+            platforms.push({ x: 0, y: GAME_HEIGHT - groundPlatformHeight, width: GAME_WIDTH, height: groundPlatformHeight, color: '#2E8B57', outline: '#1A4D2E', isGround: true });
+            const numFloatingPlatforms = 3 + Math.min(currentLevel, 7); 
+            const minPlatformWidth = 60; const maxPlatformWidth = 150; const platformHeight = 20;
+            const platformColor = '#8B4513'; const platformOutline = '#5C2E1A'; 
+            const MAX_JUMP_HEIGHT = (player.jumpStrength * player.jumpStrength) / (2 * player.gravity); 
+            const MAX_VERTICAL_GAP_ASCEND = 110; const MIN_VERTICAL_GAP = 40; 
+            const BASE_MAX_HORIZONTAL_GAP = 160; const MIN_HORIZONTAL_GAP = player.width + 20; 
+            const MIN_PLAYER_PASSAGE_HEIGHT = player.height + player.headRadius + 15; 
+            let lastPlatform = platforms[0]; 
+            for (let i = 0; i < numFloatingPlatforms; i++) {
+                let newPlatformX, newPlatformY, newPlatformWidth;
+                newPlatformWidth = minPlatformWidth + Math.random() * (maxPlatformWidth - minPlatformWidth);
+                let placementAttempts = 0; const MAX_PLACEMENT_ATTEMPTS = 30; let currentMaxHorizontal; 
+                while (placementAttempts < MAX_PLACEMENT_ATTEMPTS) {
+                    placementAttempts++; let referenceYForNewPlatform = lastPlatform.y;
+                    if (Math.random() < 0.25 && i > 0) { referenceYForNewPlatform = GAME_HEIGHT - groundPlatformHeight - platformHeight - (Math.random() * MAX_JUMP_HEIGHT * 0.6); }
+                    const yIsHigher = Math.random() < (0.45 + Math.min(currentLevel, 10) * 0.02); 
+                    let yDifference = MIN_VERTICAL_GAP + Math.random() * (MAX_VERTICAL_GAP_ASCEND - MIN_VERTICAL_GAP); 
+                    if (yIsHigher) { 
+                        newPlatformY = referenceYForNewPlatform - yDifference; const heightRatio = yDifference / MAX_JUMP_HEIGHT;
+                        currentMaxHorizontal = MIN_HORIZONTAL_GAP + (BASE_MAX_HORIZONTAL_GAP - MIN_HORIZONTAL_GAP) * Math.pow(Math.max(0, 1 - heightRatio), 1.75);
+                        currentMaxHorizontal = Math.max(currentMaxHorizontal, MIN_HORIZONTAL_GAP); 
+                    } else { 
+                        newPlatformY = referenceYForNewPlatform + yDifference * (Math.random() * 0.7); 
+                        currentMaxHorizontal = MIN_HORIZONTAL_GAP + (BASE_MAX_HORIZONTAL_GAP - MIN_HORIZONTAL_GAP) * (0.6 + Math.random() * 0.4); 
+                    }
+                    newPlatformY = Math.max(player.headRadius + 30 + platformHeight, Math.min(newPlatformY, GAME_HEIGHT - groundPlatformHeight - platformHeight - MIN_VERTICAL_GAP));
+                    const placeRight = Math.random() < 0.65; let horizontalDelta; 
+                    horizontalDelta = MIN_HORIZONTAL_GAP + Math.random() * (currentMaxHorizontal - MIN_HORIZONTAL_GAP);
+                    if (placeRight) {
+                        newPlatformX = lastPlatform.x + lastPlatform.width + horizontalDelta;
+                        if (newPlatformX + newPlatformWidth > GAME_WIDTH - 10) { newPlatformX = 10 + Math.random() * (GAME_WIDTH * 0.2); }
+                    } else { 
+                        newPlatformX = lastPlatform.x - horizontalDelta - newPlatformWidth;
+                        if (newPlatformX < 10) { newPlatformX = GAME_WIDTH - 10 - newPlatformWidth - Math.random() * (GAME_WIDTH * 0.2); }
+                    }
+                    newPlatformX = Math.max(10, Math.min(newPlatformX, GAME_WIDTH - newPlatformWidth - 10));
+                    let placementInvalid = false;
+                    for (let p_idx = 0; p_idx < platforms.length; p_idx++) { 
+                        const existingPlatform = platforms[p_idx];
+                        if (newPlatformX < existingPlatform.x + existingPlatform.width && newPlatformX + newPlatformWidth > existingPlatform.x && newPlatformY < existingPlatform.y + existingPlatform.height && newPlatformY + platformHeight > existingPlatform.y) { placementInvalid = true; break; }
+                        if (newPlatformX < existingPlatform.x + existingPlatform.width && newPlatformX + newPlatformWidth > existingPlatform.x) { 
+                            if (newPlatformY + platformHeight <= existingPlatform.y) { 
+                                const verticalGap = existingPlatform.y - (newPlatformY + platformHeight);
+                                if (verticalGap > 0 && verticalGap < MIN_PLAYER_PASSAGE_HEIGHT) { placementInvalid = true; break; }
+                            } else if (newPlatformY >= existingPlatform.y + existingPlatform.height) { 
+                                const verticalGap = newPlatformY - (existingPlatform.y + existingPlatform.height);
+                                if (verticalGap > 0 && verticalGap < MIN_PLAYER_PASSAGE_HEIGHT) { placementInvalid = true; break; }
+                            }
+                        }
+                    }
+                    if (!placementInvalid) break; 
+                } 
+                if (placementAttempts >= MAX_PLACEMENT_ATTEMPTS) {
+                    console.warn(`Max placement attempts for platform ${i}. Placing fallback.`);
+                    newPlatformY = GAME_HEIGHT - groundPlatformHeight - platformHeight - (MIN_VERTICAL_GAP + Math.random() * (MAX_JUMP_HEIGHT * 0.5));
+                    newPlatformX = (GAME_WIDTH / 2 - newPlatformWidth / 2) + (Math.random() - 0.5) * (GAME_WIDTH / 3);
+                }
+                const newActualPlatform = { x: newPlatformX, y: newPlatformY, width: newPlatformWidth, height: platformHeight, color: platformColor, outline: platformOutline, isGround: false };
+                platforms.push(newActualPlatform);
+                carrots.push({ x: newPlatformX + newPlatformWidth / 2 - carrotProps.width / 2, y: newPlatformY - carrotProps.height, collected: false });
+                if (Math.random() < 0.75 || i === 0) lastPlatform = newActualPlatform;
+                else if (platforms.length > 1 && Math.random() < 0.6) lastPlatform = platforms[Math.floor(Math.random() * (platforms.length -1)) + 1]; 
+                else lastPlatform = platforms[0]; 
+            } 
+            const numGroundCarrots = 1 + Math.floor(currentLevel / 2);
+            for(let k=0; k < numGroundCarrots; k++){
+                 if (carrots.length < numFloatingPlatforms + 5 + currentLevel) { 
+                    let groundCarrotXAttempt = 100 + Math.random() * (GAME_WIDTH - 200);
+                    if (!carrots.some(c => Math.abs(c.x - groundCarrotXAttempt) < carrotProps.width * 4 && c.y > GAME_HEIGHT - (groundPlatformHeight + carrotProps.height + 10) ) && Math.abs(groundCarrotXAttempt - player.startX) > player.width * 3) {
+                         carrots.push({ x: groundCarrotXAttempt, y: GAME_HEIGHT - groundPlatformHeight - carrotProps.height, collected: false });
+                    }
+                 }
+            }
+            carrotsRemaining = carrots.filter(c => !c.collected).length;
+            if (carrotsRemaining === 0 && (numFloatingPlatforms > 0 || platforms.length > 1) ) { 
+                const targetPlatform = platforms.length > 1 ? platforms[platforms.length -1] : platforms[0]; 
+                if (targetPlatform) {
+                    carrots.push({ x: targetPlatform.x + targetPlatform.width / 2 - carrotProps.width / 2, y: targetPlatform.y - carrotProps.height, collected: false });
+                    carrotsRemaining = 1;
+                }
+            }
+        }
+
+        function startNewLevel() { // Keep your existing startNewLevel
+            levelTransitioning = true; currentLevel++; gameWon = false;
+            player.x = player.startX; player.velocityX = 0; player.velocityY = 0;
+            player.isJumping = false; player.facing = 'right';
+            generateLevel(); 
+            if (platforms.length > 0 && platforms[0].isGround) { player.y = GAME_HEIGHT - platforms[0].height - player.height; } 
+            else { player.y = GAME_HEIGHT - 40 - player.height; }
+            player.onGround = true; 
+            updateUIDisplays(); 
+            setTimeout(() => { levelTransitioning = false; }, 700); 
+        }
+
+        function drawPlayer() { /* Keep your existing detailed drawPlayer */ 
+            ctx.save(); ctx.translate(player.x, player.y); ctx.fillStyle = player.color; ctx.strokeStyle = player.outlineColor; ctx.lineWidth = 2;
+            const bodyHeight = player.height; const bodyWidth = player.width; const bodyRadius = 8; 
+            ctx.beginPath(); ctx.moveTo(bodyRadius, 0); ctx.lineTo(bodyWidth - bodyRadius, 0); ctx.arcTo(bodyWidth, 0, bodyWidth, bodyRadius, bodyRadius); ctx.lineTo(bodyWidth, bodyHeight - bodyRadius); ctx.arcTo(bodyWidth, bodyHeight, bodyWidth - bodyRadius, bodyHeight, bodyRadius); ctx.lineTo(bodyRadius, bodyHeight); ctx.arcTo(0, bodyHeight, 0, bodyHeight - bodyRadius, bodyRadius); ctx.lineTo(0, bodyRadius); ctx.arcTo(0, 0, bodyRadius, 0, bodyRadius); ctx.closePath(); ctx.fill(); ctx.stroke();
+            const headCenterX = bodyWidth / 2; const headCenterY = -player.headRadius / 2 + 3; 
+            ctx.beginPath(); ctx.arc(headCenterX, headCenterY, player.headRadius, 0, Math.PI * 2); ctx.fillStyle = player.color; ctx.fill(); ctx.strokeStyle = player.outlineColor; ctx.stroke();
+            const earYOffset = headCenterY - player.headRadius + 2; const earSpacing = player.headRadius * 0.3;
+            const leftEarX = player.facing === 'right' ? headCenterX - player.earWidth - earSpacing : headCenterX + earSpacing;
+            ctx.fillStyle = player.color; ctx.beginPath(); ctx.moveTo(leftEarX, earYOffset); ctx.lineTo(leftEarX - player.earWidth / 3, earYOffset - player.earHeight); ctx.lineTo(leftEarX + player.earWidth * (2/3), earYOffset - player.earHeight + 5); ctx.lineTo(leftEarX + player.earWidth, earYOffset); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = player.innerEarColor; ctx.beginPath(); ctx.moveTo(leftEarX + player.earWidth*0.15, earYOffset -2); ctx.lineTo(leftEarX - player.earWidth / 3 + player.earWidth*0.15, earYOffset - player.earHeight + 5); ctx.lineTo(leftEarX + player.earWidth * (2/3) - player.earWidth*0.1, earYOffset - player.earHeight + 5 + 3); ctx.lineTo(leftEarX + player.earWidth - player.earWidth*0.25, earYOffset-2); ctx.closePath(); ctx.fill();
+            const rightEarX = player.facing === 'right' ? headCenterX + earSpacing : headCenterX - player.earWidth - earSpacing;
+            ctx.fillStyle = player.color; ctx.beginPath(); ctx.moveTo(rightEarX, earYOffset); ctx.lineTo(rightEarX - player.earWidth / 3, earYOffset - player.earHeight + 5); ctx.lineTo(rightEarX + player.earWidth * (2/3), earYOffset - player.earHeight); ctx.lineTo(rightEarX + player.earWidth, earYOffset); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = player.innerEarColor; ctx.beginPath(); ctx.moveTo(rightEarX + player.earWidth*0.15, earYOffset-2); ctx.lineTo(rightEarX - player.earWidth / 3 + player.earWidth*0.15, earYOffset - player.earHeight + 5 +3); ctx.lineTo(rightEarX + player.earWidth * (2/3) - player.earWidth*0.1, earYOffset - player.earHeight + 5); ctx.lineTo(rightEarX + player.earWidth - player.earWidth*0.25, earYOffset-2); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = player.eyeColor; const eyeSize = 4; const eyeY = headCenterY - player.headRadius * 0.1; const eyeOffsetFromCenter = player.headRadius * 0.3;
+            if (player.facing === 'right') { ctx.beginPath(); ctx.arc(headCenterX + eyeOffsetFromCenter, eyeY, eyeSize / 2, 0, Math.PI * 2); ctx.fill(); } else { ctx.beginPath(); ctx.arc(headCenterX - eyeOffsetFromCenter, eyeY, eyeSize / 2, 0, Math.PI * 2); ctx.fill(); }
+            ctx.fillStyle = player.noseColor; const noseSize = 3; const noseYPos = headCenterY + player.headRadius * 0.2; const noseXOffset = player.facing === 'right' ? player.headRadius * 0.65 : -player.headRadius * 0.65;
+            ctx.beginPath(); ctx.moveTo(headCenterX + noseXOffset - noseSize, noseYPos); ctx.lineTo(headCenterX + noseXOffset + noseSize, noseYPos); ctx.lineTo(headCenterX + noseXOffset, noseYPos + noseSize); ctx.closePath(); ctx.fill();
+            if (player.onGround) { ctx.fillStyle = player.color; ctx.strokeStyle = player.outlineColor; const tailRadius = 6; const tailX = player.facing === 'right' ? -tailRadius / 2 : bodyWidth - tailRadius /2; const tailY = bodyHeight - tailRadius * 1.5; ctx.beginPath(); ctx.arc(tailX, tailY, tailRadius, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+            ctx.restore(); 
+        }
+        function drawPlatforms() { /* Keep your existing drawPlatforms */ platforms.forEach(platform => { ctx.fillStyle = platform.color; ctx.fillRect(platform.x, platform.y, platform.width, platform.height); ctx.strokeStyle = platform.outline; ctx.lineWidth = 2; ctx.strokeRect(platform.x, platform.y, platform.width, platform.height); }); }
+        function drawCarrots() { /* Keep your existing drawCarrots */ carrots.forEach(carrot => { if (!carrot.collected) { ctx.fillStyle = carrotProps.color; ctx.beginPath(); ctx.ellipse(carrot.x + carrotProps.width / 2, carrot.y + carrotProps.height * 0.6, carrotProps.width / 2, carrotProps.height * 0.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = carrotProps.outlineColor; ctx.lineWidth = 1; ctx.stroke(); ctx.fillStyle = carrotProps.leafColor; const leafBaseX = carrot.x + carrotProps.width / 2; const leafBaseY = carrot.y; ctx.beginPath(); ctx.moveTo(leafBaseX, leafBaseY); ctx.quadraticCurveTo(leafBaseX - 5, leafBaseY - 10, leafBaseX - 2, leafBaseY - 15); ctx.quadraticCurveTo(leafBaseX, leafBaseY - 12, leafBaseX + 2, leafBaseY -15); ctx.quadraticCurveTo(leafBaseX + 5, leafBaseY - 10, leafBaseX, leafBaseY); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(leafBaseX, leafBaseY-1); ctx.quadraticCurveTo(leafBaseX + 5, leafBaseY - 10, leafBaseX + 2, leafBaseY - 15); ctx.quadraticCurveTo(leafBaseX, leafBaseY - 13, leafBaseX - 2, leafBaseY -15); ctx.quadraticCurveTo(leafBaseX - 5, leafBaseY - 10, leafBaseX, leafBaseY-1); ctx.closePath(); ctx.fill(); } }); }
+        function updateUIDisplays() { carrotCountDisplay.textContent = `Carrots Remaining: ${carrotsRemaining}`; levelDisplay.textContent = `Current Level: ${currentLevel}`; }
+        function checkCarrotCollisions() { /* Keep your existing checkCarrotCollisions */ const playerLeft = player.x; const playerRight = player.x + player.width; const playerTop = player.y - player.headRadius; const playerBottom = player.y + player.height; for (let i = 0; i < carrots.length; i++) { const carrot = carrots[i]; if (!carrot.collected) { if (playerLeft < carrot.x + carrotProps.width && playerRight > carrot.x && playerTop < carrot.y + carrotProps.height && playerBottom > carrot.y) { carrot.collected = true; carrotsRemaining--; updateUIDisplays(); if (carrotsRemaining === 0) { gameWon = true; levelTransitioning = true; setTimeout(startNewLevel, 2000); } } } } }
+        function updatePlayerPosition() { /* Keep your existing updatePlayerPosition */ player.velocityX = 0; if (keys.ArrowLeft && player.x > 0) { player.velocityX = -player.speed; player.facing = 'left';} if (keys.ArrowRight && player.x < GAME_WIDTH - player.width) { player.velocityX = player.speed; player.facing = 'right';} player.x += player.velocityX; if (keys.Space && player.onGround && !player.isJumping) { player.velocityY = -player.jumpStrength; player.onGround = false; player.isJumping = true; } if (!keys.Space && player.isJumping && player.velocityY < -player.jumpStrength / 2.5) { player.velocityY = -player.jumpStrength / 2.5; } if (!keys.Space && player.isJumping) { player.isJumping = false; } player.velocityY += player.gravity; player.y += player.velocityY; player.onGround = false; const playerBottomEdge = player.y + player.height; const playerPrevBottomEdge = player.y - player.velocityY + player.height; const playerTopEdge = player.y - player.headRadius; const playerPrevTopEdge = player.y - player.velocityY - player.headRadius; for (let i = 0; i < platforms.length; i++) { const platform = platforms[i]; if (player.x < platform.x + platform.width && player.x + player.width > platform.x) { if (playerPrevBottomEdge <= platform.y && playerBottomEdge >= platform.y) { player.y = platform.y - player.height; player.velocityY = 0; player.onGround = true; player.isJumping = false; continue; } if (playerPrevTopEdge >= platform.y + platform.height && playerTopEdge <= platform.y + platform.height) { player.y = platform.y + platform.height + player.headRadius; if (player.velocityY < 0) player.velocityY = 0.1; continue; } if (playerBottomEdge > platform.y && playerTopEdge < platform.y + platform.height) {  if (player.velocityX > 0 && (player.x + player.width - player.velocityX) <= platform.x) { player.x = platform.x - player.width; player.velocityX = 0; } else if (player.velocityX < 0 && (player.x - player.velocityX) >= platform.x + platform.width) { player.x = platform.x + platform.width; player.velocityX = 0; } } } } if (player.y + player.height > GAME_HEIGHT) { player.y = GAME_HEIGHT - player.height; player.velocityY = 0; player.onGround = true; player.isJumping = false; } if (player.y - player.headRadius < 0) { player.y = player.headRadius; if (player.velocityY < 0) player.velocityY = 0.1; } }
+        function displayLevelCompleteMessage() { /* Keep your existing displayLevelCompleteMessage */ ctx.fillStyle = "rgba(0, 0, 0, 0.75)"; ctx.fillRect(0, GAME_HEIGHT / 3, GAME_WIDTH, GAME_HEIGHT / 3); ctx.font = "bold 36px Arial"; ctx.fillStyle = "#32CD32"; ctx.textAlign = "center"; ctx.fillText(`Level ${currentLevel} Complete!`, GAME_WIDTH / 2, GAME_HEIGHT / 2 - 15); ctx.font = "20px Arial"; ctx.fillStyle = "#FFFFFF"; ctx.fillText("Get ready for the next level...", GAME_WIDTH / 2, GAME_HEIGHT / 2 + 25); }
+
+        function gameLoop() {
+            ctx.fillStyle = '#78c0ff'; 
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT); 
+            if (!levelTransitioning) { 
+                 updatePlayerPosition();
+                 checkCarrotCollisions();
+            }
+            drawPlatforms(); drawCarrots(); drawPlayer(); 
+            if (gameWon && levelTransitioning) { 
+                displayLevelCompleteMessage();
+            }
+            requestAnimationFrame(gameLoop); 
+        }
+
+        function initializeGame() {
+            currentLevel = 0; 
+            startNewLevel(); 
+            
+            resizeCanvasAndLayout();
+            window.addEventListener('resize', resizeCanvasAndLayout);
+            if (window.screen && window.screen.orientation) {
+                 window.screen.orientation.addEventListener('change', resizeCanvasAndLayout);
+            } else { 
+                 window.addEventListener('orientationchange', resizeCanvasAndLayout);
+            }
+
+            gameLoop(); 
+            console.log("Ariana's Jumping Bunnies is running!");
+
+            // --- Logo Fade Out Logic ---
+            const logoDisplayDuration = 2500; // How long the logo stays fully visible (milliseconds)
+            const logoFadeDuration = 1000;    // Corresponds to CSS transition duration (milliseconds)
+
+            if (logoOverlay) {
+                setTimeout(() => {
+                    logoOverlay.style.opacity = '0'; // Start fading out
+                    
+                    // After fade animation completes, hide the overlay
+                    setTimeout(() => {
+                        logoOverlay.style.display = 'none';
+                    }, logoFadeDuration);
+
+                }, logoDisplayDuration);
+            }
+        }
+        
+        window.onload = initializeGame;
+
+    </script>
+
+</body>
+</html>
