@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, user-scalable=no"
+      content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
     <title>Cyberpunk Maze Runner</title>
     <link
@@ -13,34 +13,40 @@
     />
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+      html {
+        width: 100%;
+        height: 100%;
+        overflow: hidden; /* Prevent scroll on html */
+        margin: 0;
+        padding: 0;
+      }
       body {
         font-family: "Press Start 2P", cursive;
-        background-color: #0a0a0a;
+        background-color: #0a0a0a; /* Base background, gameContainer will cover it */
         color: #00ff00;
         margin: 0;
         padding: 0;
         overflow: hidden; /* Prevent scrollbars on body */
+        width: 100%;
+        height: 100%;
+        touch-action: none; /* Essential for preventing unwanted touch behaviors */
+      }
+      #gameContainer {
+        width: 100%; /* Fill body */
+        height: 100%; /* Fill body */
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 100vh; /* Fallback, JS will use window.innerHeight */
-        touch-action: none;
-      }
-      #gameContainer {
-        position: relative;
-        width: 100vw; /* Take full width */
-        /* height will be set by JS to window.innerHeight */
-        max-width: 100vw;
-        max-height: 100vh; /* Ensure it doesn't exceed viewport boundaries */
-        overflow: hidden; /* Clip canvas if it somehow overflows */
-        display: flex; /* For centering canvas */
-        justify-content: center;
-        align-items: center;
+        overflow: hidden; /* Important: prevent canvas from causing scroll on container */
+        position: relative; /* For positioning overlays and UI elements */
       }
       canvas {
         display: block;
-        background-color: #111;
-        /* width and height will be set by JS to fit within gameContainer */
+        background-color: #111; /* Initial canvas background */
+        /* width and height will be set by JS */
+        image-rendering: pixelated; /* Optional: for sharper pixels if using low-res sprites */
+        image-rendering: -moz-crisp-edges;
+        image-rendering: crisp-edges;
       }
       .overlay {
         position: absolute;
@@ -99,7 +105,7 @@
         font-size: 1.5rem;
         color: #00ff00;
         text-shadow: 0 0 5px #00ff00;
-        z-index: 5;
+        z-index: 5; /* Ensure they are above the canvas but below overlays */
       }
       #timerDisplay {
         left: 10px;
@@ -196,6 +202,7 @@
         }
       }
 
+      /* Responsive adjustments */
       @media (max-width: 600px) {
         .overlay h1 {
           font-size: 1.8rem;
@@ -210,6 +217,12 @@
         #timerDisplay,
         #scoreDisplay {
           font-size: 1.2rem;
+          top: 5px;
+          left: 5px;
+        }
+        #scoreDisplay {
+          right: 5px;
+          left: auto;
         }
         #mazeInfoDisplay h2 {
           font-size: 1.5rem;
@@ -225,6 +238,25 @@
         }
         #dailyLockoutMessage {
           font-size: 0.9rem;
+        }
+      }
+      @media (max-height: 400px) {
+        /* For very short screens in landscape */
+        .overlay h1 {
+          font-size: 1.5rem;
+          margin-bottom: 10px;
+        }
+        .overlay p {
+          font-size: 0.8rem;
+          margin-bottom: 5px;
+        }
+        .overlay button {
+          font-size: 0.9rem;
+          padding: 10px 20px;
+        }
+        #timerDisplay,
+        #scoreDisplay {
+          font-size: 1rem;
         }
       }
     </style>
@@ -243,7 +275,7 @@
         <button id="startButton">Start Run</button>
       </div>
 
-      <div id="mazeInfoDisplay">
+      <div id="mazeInfoDisplay" class="overlay hidden">
         <h2 id="mazeInfoNumber"></h2>
         <p id="mazeInfoName"></p>
       </div>
@@ -311,6 +343,54 @@
         );
         playerSpriteLoaded = false;
       };
+
+      let currentSeedForRNG;
+      let seededRandomGenerator;
+
+      function cyrb128(str) {
+        let h1 = 1779033703,
+          h2 = 3144134277,
+          h3 = 1013904242,
+          h4 = 2773480762;
+        for (let i = 0, k; i < str.length; i++) {
+          k = str.charCodeAt(i);
+          h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+          h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+          h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+          h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+        }
+        h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+        h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+        h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+        h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+        return [
+          (h1 ^ h2 ^ h3 ^ h4) >>> 0,
+          (h2 ^ h1) >>> 0,
+          (h3 ^ h1) >>> 0,
+          (h4 ^ h1) >>> 0,
+        ];
+      }
+
+      function mulberry32(a) {
+        return function () {
+          var t = (a += 0x6d2b79f5);
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function initializeSeededRNG(dateString) {
+        const seedParts = cyrb128(dateString);
+        currentSeedForRNG = seedParts[0];
+        seededRandomGenerator = mulberry32(currentSeedForRNG);
+        console.log(
+          "RNG seeded for date:",
+          dateString,
+          "with seed:",
+          currentSeedForRNG
+        );
+      }
 
       const neonColorPalettes = [
         {
@@ -384,7 +464,13 @@
       ];
 
       function getRandomElement(arr) {
-        return arr[Math.floor(Math.random() * arr.length)];
+        if (!seededRandomGenerator) {
+          console.warn(
+            "Seeded RNG not initialized, using Math.random() as fallback for getRandomElement."
+          );
+          return arr[Math.floor(Math.random() * arr.length)];
+        }
+        return arr[Math.floor(seededRandomGenerator() * arr.length)];
       }
       function generateCyberpunkName() {
         return `${getRandomElement(namePrefixes)}${getRandomElement(
@@ -393,20 +479,28 @@
       }
 
       function resizeCanvas() {
-        gameContainer.style.height = `${window.innerHeight}px`;
+        // gameContainer is now sized by CSS (width: 100%, height: 100% of body, which is 100% of html)
         const containerWidth = gameContainer.clientWidth;
         const containerHeight = gameContainer.clientHeight;
+
         const minDimension = Math.min(containerWidth, containerHeight);
         cellSize = Math.floor(minDimension / 10);
         if (cellSize < 20) cellSize = 20;
+
         cols = Math.floor(containerWidth / cellSize);
         rows = Math.floor(containerHeight / cellSize);
+
         if (cols < 1) cols = 1;
         if (rows < 1) rows = 1;
+
         const effectiveMazeWidth = cols * cellSize;
         const effectiveMazeHeight = rows * cellSize;
+
         canvas.width = effectiveMazeWidth;
         canvas.height = effectiveMazeHeight;
+
+        // Canvas is centered by flexbox in #gameContainer, no margin adjustments needed.
+
         if (gameState === "playing" || gameState === "preMaze") {
           setupNewMaze();
         }
@@ -440,7 +534,7 @@
           if (neighbors.length > 0) {
             stack.push(current);
             const randomNeighbor =
-              neighbors[Math.floor(Math.random() * neighbors.length)];
+              neighbors[Math.floor(seededRandomGenerator() * neighbors.length)];
             removeWall(current, randomNeighbor);
             current = randomNeighbor;
             current.visited = true;
@@ -572,7 +666,7 @@
         player = { r: 0, c: 0 };
         exit = { r: Math.max(0, rows - 1), c: Math.max(0, cols - 1) };
         if (rows <= 1 && cols <= 1) {
-          /* 1x1 maze, player starts at exit */
+          /* 1x1 maze */
         } else if (player.r === exit.r && player.c === exit.c) {
           if (cols > 1) {
             exit.c = cols - 1;
@@ -657,8 +751,8 @@
         timeLeft = GAME_DURATION;
         updateScoreDisplay();
         updateTimerDisplay();
-        resizeCanvas();
-        startPreMazeTransition();
+        resizeCanvas(); // This will setup initial maze dimensions
+        startPreMazeTransition(); // This will generate and draw the first maze
         if (gameTimerInterval) clearInterval(gameTimerInterval);
         gameTimerInterval = setInterval(updateGameTimer, 1000);
         canvas.addEventListener("touchstart", handleTouch, { passive: false });
@@ -669,14 +763,17 @@
         gameState = "preMaze";
         mazeInfoNumber.textContent = `Maze ${score + 1}`;
         mazeInfoName.textContent = generateCyberpunkName();
-        mazeInfoDisplay.classList.add("visible");
+        // Change mazeInfoDisplay from overlay to non-overlay if it was one
+        mazeInfoDisplay.classList.remove("hidden"); // Make sure it's not display:none
+        mazeInfoDisplay.classList.add("visible"); // Use opacity transition
+
         setTimeout(() => {
           mazeInfoDisplay.classList.remove("visible");
+          // No need to add 'hidden' class if opacity handles pointer-events
           setTimeout(() => {
             gameState = "playing";
-            // BUG FIX: Always call setupNewMaze() to load the next maze
             setupNewMaze();
-          }, 500);
+          }, 500); // Match CSS transition for opacity
         }, 1500);
       }
 
@@ -782,8 +879,9 @@
           }, delay);
           delay += 150;
         });
+        // Ensure high score screen is not 'hidden' by display:none before trying to set opacity
         highScoreScreen.classList.remove("hidden");
-        setTimeout(() => (highScoreScreen.style.opacity = "1"), 10);
+        setTimeout(() => (highScoreScreen.style.opacity = "1"), 10); // Trigger fade-in
       }
 
       startButton.addEventListener("click", () => {
@@ -791,17 +889,25 @@
           "cyberpunkMazeRunnerLastPlayDate"
         );
         const currentDateISO = new Date().toISOString().split("T")[0];
+
+        initializeSeededRNG(currentDateISO);
+
         introScreen.style.opacity = "0";
+        // Stricter daily lockout: only allow play if lastPlayDate is not today.
+        // The score > 0 check was problematic if a user had a bad run.
         if (lastPlayDate === currentDateISO) {
           setTimeout(() => {
             introScreen.classList.add("hidden");
             showAlreadyPlayedScreen();
-          }, 1000);
+          }, 1000); // Match CSS transition
         } else {
+          // It's a new day or first play ever.
+          // The localStorage.removeItem for 'cyberpunkMazeRunnerLastPlayDate' was for testing and should be removed for production.
+          // The lastPlayDate will be set at the end of a successful run in endGame().
           setTimeout(() => {
             introScreen.classList.add("hidden");
             startGame();
-          }, 1000);
+          }, 1000); // Match CSS transition
         }
       });
 
@@ -813,9 +919,19 @@
         gameState = "intro";
         currentPalette = neonColorPalettes[0];
         playerSprite.src = playerSpriteURL;
+
+        const todayDateString = new Date().toISOString().split("T")[0];
+        initializeSeededRNG(todayDateString);
+
         resizeCanvas();
+        // Ensure overlays are correctly hidden/shown initially
         introScreen.classList.remove("hidden");
         introScreen.style.opacity = "1";
+        mazeInfoDisplay.classList.add("hidden"); // Start hidden
+        mazeInfoDisplay.classList.remove("visible");
+        highScoreScreen.classList.add("hidden");
+        highScoreScreen.style.opacity = "0";
+
         timerDisplay.textContent = `Time: ${String(
           Math.floor(GAME_DURATION / 60)
         ).padStart(2, "0")}:${String(GAME_DURATION % 60).padStart(2, "0")}`;
