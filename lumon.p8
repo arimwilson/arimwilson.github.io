@@ -216,8 +216,8 @@ function cast_ray(a)
   local dir_x = cos(a)
   local dir_y = sin(a)
   -- map position to grid
-  local map_x = flr(player.x)
-  local map_y = flr(player.y)
+  local map_x = flr(player.x) + 1
+  local map_y = flr(player.y) + 1
 
   -- length of ray from one x or y side to next
   local delta_dist_x = abs(1 / (dir_x == 0 and 0.00001 or dir_x))
