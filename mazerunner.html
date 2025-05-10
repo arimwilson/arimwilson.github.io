@@ -478,6 +478,21 @@
         )} ${getRandomElement(nameSuffixes)}`;
       }
 
+      // ========= RektFM radio =========
+      const radio = document.getElementById("bgRadio");
+      radio.volume = 0.35;           // tweak taste
+      radio.loop   = true;           // stream is continuous, keep it safe
+
+      function startRadio() {
+        radio.play().catch(err => {
+          // Happens only if the user blocks autoplay or toggles mute first.
+          console.warn("Radio play() blocked:", err);
+        });
+     }
+     function stopRadio() {
+       if (!radio.paused) radio.pause();
+     }
+      
       function resizeCanvas() {
         // gameContainer is now sized by CSS (width: 100%, height: 100% of body, which is 100% of html)
         const containerWidth = gameContainer.clientWidth;
@@ -747,6 +762,7 @@
       }
 
       function startGame() {
+        startRadio();
         score = 0;
         timeLeft = GAME_DURATION;
         updateScoreDisplay();
@@ -797,6 +813,7 @@
       }
 
       function endGame() {
+        stopRadio();
         gameState = "gameOver";
         clearInterval(gameTimerInterval);
         canvas.removeEventListener("touchstart", handleTouch);
@@ -942,5 +959,9 @@
       }
       init();
     </script>
+  <audio id="bgRadio"
+       src="https://stream.rekt.fm/darksynth.mp3"   <!-- 320 kb/s MP3 :contentReference[oaicite:0]{index=0} -->
+       preload="none"
+       crossorigin="anonymous"></audio>
   </body>
 </html>
