@@ -802,8 +802,64 @@ function createBuildingTexture() {
     return tex;
 }
 
+function createRoadTexture() {
+    const canvasSize = 2048;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = canvasSize;
+    const ctx = canvas.getContext('2d');
+
+    const worldScale = canvasSize / CONFIG.worldSize;
+    const halfSize = canvasSize / 2;
+    const roadWidth = 14 * worldScale;
+
+    ctx.fillStyle = '#1b1b1b';
+    ctx.fillRect(0, 0, canvasSize, canvasSize);
+
+    const roadColor = '#2f2f2f';
+    const laneColor = '#e8e8e8';
+    const dash = 20 * worldScale;
+    const gap = 14 * worldScale;
+    const lineWidth = Math.max(2, 3 * worldScale);
+
+    const roadCoords = [];
+    for(let c = -380; c <= 380; c += 40) roadCoords.push(c);
+
+    roadCoords.forEach(coord => {
+        const center = halfSize + coord * worldScale;
+
+        // Horizontal roads (east-west)
+        ctx.fillStyle = roadColor;
+        ctx.fillRect(0, center - roadWidth / 2, canvasSize, roadWidth);
+
+        // Vertical roads (north-south)
+        ctx.fillRect(center - roadWidth / 2, 0, roadWidth, canvasSize);
+
+        // Lane markings for horizontal road
+        ctx.strokeStyle = laneColor;
+        ctx.lineWidth = lineWidth;
+        ctx.setLineDash([dash, gap]);
+        ctx.beginPath();
+        ctx.moveTo(0, center);
+        ctx.lineTo(canvasSize, center);
+        ctx.stroke();
+
+        // Lane markings for vertical road
+        ctx.beginPath();
+        ctx.moveTo(center, 0);
+        ctx.lineTo(center, canvasSize);
+        ctx.stroke();
+    });
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.anisotropy = 8;
+    tex.needsUpdate = true;
+    return tex;
+}
+
 function generateCity() {
-    const roadMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8 });
+    const roadTexture = createRoadTexture();
+    const roadMat = new THREE.MeshStandardMaterial({ map: roadTexture, roughness: 0.8 });
     // PERFORMANCE FIX: Single shared material and texture for all buildings
     const buildingTex = createBuildingTexture();
     const buildingMat = new THREE.MeshStandardMaterial({ map: buildingTex, roughness: 0.3 });
