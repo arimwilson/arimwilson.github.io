@@ -465,44 +465,24 @@ function initTouchControls() {
     const lookZone = document.getElementById('zone-look');
     let lastLookX, lastLookY;
     
-    let lookTouchId = null;
-
     lookZone.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        // Only track a single touch for look to avoid jumpy camera movement
-        if (lookTouchId !== null) return;
         const touch = e.changedTouches[0];
-        lookTouchId = touch.identifier;
         lastLookX = touch.clientX;
         lastLookY = touch.clientY;
-    }, { passive: false });
+    });
 
     lookZone.addEventListener('touchmove', (e) => {
-        const touch = Array.from(e.changedTouches).find(t => t.identifier === lookTouchId);
-        if (!touch) return;
-        e.preventDefault();
+        const touch = e.changedTouches[0];
         const dx = touch.clientX - lastLookX;
         const dy = touch.clientY - lastLookY;
-
-        // Slightly lower sensitivity and clamp pitch to reduce jitter
-        cameraAngles.yaw -= dx * 0.0035;
-        cameraAngles.pitch += dy * 0.0035;
+        
+        cameraAngles.yaw -= dx * 0.005;
+        cameraAngles.pitch += dy * 0.005;
         cameraAngles.pitch = Math.max(-Math.PI/2.5, Math.min(Math.PI/2.5, cameraAngles.pitch));
-
+        
         lastLookX = touch.clientX;
         lastLookY = touch.clientY;
-    }, { passive: false });
-
-    const resetLookTouch = (e) => {
-        const touch = Array.from(e.changedTouches).find(t => t.identifier === lookTouchId);
-        if (!touch) return;
-        e.preventDefault();
-        lookTouchId = null;
-        lastLookX = lastLookY = null;
-    };
-
-    lookZone.addEventListener('touchend', resetLookTouch, { passive: false });
-    lookZone.addEventListener('touchcancel', resetLookTouch, { passive: false });
+    });
 
     const btnMap = [
         { id: 'btn-sprint', key: 'shift' },
