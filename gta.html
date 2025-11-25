@@ -625,8 +625,17 @@ function addCash(amount) {
 }
 
 // --- SHOOTING ---
+function knockDownPed(ped) {
+    if (ped && !ped.isDead) {
+        ped.isDead = true;
+        // Ragdoll visual (fall over)
+        ped.mesh.rotation.x = -Math.PI / 2;
+        ped.mesh.position.y = 0.5;
+    }
+}
+
 function shootGun() {
-    if(gameState.isDriving) return; 
+    if(gameState.isDriving) return;
 
     // Flash
     const flash = new THREE.PointLight(0xffffaa, 5, 5);
@@ -676,12 +685,7 @@ function shootGun() {
         while(obj.parent && obj.parent.type !== 'Scene') obj = obj.parent;
         
         const ped = pedestrians.find(p => p.mesh === obj);
-        if(ped && !ped.isDead) {
-            ped.isDead = true;
-            // Ragdoll visual (fall over)
-            ped.mesh.rotation.x = -Math.PI / 2;
-            ped.mesh.position.y = 0.5;
-        }
+        knockDownPed(ped);
     }
 
     // Tracer
@@ -1066,6 +1070,17 @@ function updateVehicles(dt) {
             v.mesh.position.copy(nextPos);
             v.mesh.children[0].rotation.z = THREE.MathUtils.lerp(v.mesh.children[0].rotation.z, -v.steering * 0.05, dt * 5);
         }
+
+        if (v === activeVehicle && Math.abs(v.speed) > 2) {
+            pedestrians.forEach(ped => {
+                if (ped.isDead) return;
+                const dist = ped.mesh.position.distanceTo(v.mesh.position);
+                const pedRadius = ped.radius ?? 0.6;
+                if (dist < v.radius + pedRadius) {
+                    knockDownPed(ped);
+                }
+            });
+        }
     });
 }
 
@@ -1138,7 +1153,8 @@ function initPedestrians() {
             mesh: group,
             parts: { legL, legR },
             dir: new THREE.Vector3(Math.random()-0.5, 0, Math.random()-0.5).normalize(),
-            isDead: false
+            isDead: false,
+            radius: 0.6
         });
     }
 }
