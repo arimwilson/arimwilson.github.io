@@ -353,6 +353,7 @@ let input = {
 };
 let gameState = { wantedLevel: 0, cash: 0, isDriving: false, wasted: false, activeMission: null };
 let cameraAngles = { yaw: 0, pitch: 0.2 };
+let touchLookState = { targetYawDelta: 0, targetPitchDelta: 0, velocityYaw: 0, velocityPitch: 0 };
 let minimapCtx;
 let raycaster = new THREE.Raycaster();
 const dummy = new THREE.Object3D(); // For InstancedMesh updates
@@ -491,7 +492,13 @@ function initTouchControls() {
 
     const lookZone = document.getElementById('zone-look');
     let lastLookX, lastLookY;
-    
+    const LOOK_YAW_SENSITIVITY = 0.0045;
+    const LOOK_PITCH_SENSITIVITY = 0.0035;
+    const LOOK_DELTA_CAP = 50;
+    const LOOK_FILTER_STRENGTH = 0.3;
+    const LOOK_INERTIA_DECAY = 0.8;
+    const MOBILE_LOOK_MULTIPLIER = 0.8;
+
     lookZone.addEventListener('touchstart', (e) => {
         const touch = e.changedTouches[0];
         lastLookX = touch.clientX;
@@ -500,16 +507,28 @@ function initTouchControls() {
 
     lookZone.addEventListener('touchmove', (e) => {
         const touch = e.changedTouches[0];
-        const dx = touch.clientX - lastLookX;
-        const dy = touch.clientY - lastLookY;
-        
-        cameraAngles.yaw -= dx * 0.005;
-        cameraAngles.pitch += dy * 0.005;
-        cameraAngles.pitch = Math.max(-Math.PI/2.5, Math.min(Math.PI/2.5, cameraAngles.pitch));
-        
+        const dx = THREE.MathUtils.clamp(touch.clientX - lastLookX, -LOOK_DELTA_CAP, LOOK_DELTA_CAP);
+        const dy = THREE.MathUtils.clamp(touch.clientY - lastLookY, -LOOK_DELTA_CAP, LOOK_DELTA_CAP);
+
+        const yawDelta = -dx * LOOK_YAW_SENSITIVITY * MOBILE_LOOK_MULTIPLIER;
+        const pitchDelta = dy * LOOK_PITCH_SENSITIVITY * MOBILE_LOOK_MULTIPLIER;
+
+        touchLookState.targetYawDelta = THREE.MathUtils.lerp(touchLookState.targetYawDelta, yawDelta, LOOK_FILTER_STRENGTH);
+        touchLookState.targetPitchDelta = THREE.MathUtils.lerp(touchLookState.targetPitchDelta, pitchDelta, LOOK_FILTER_STRENGTH);
+        touchLookState.targetYawDelta *= LOOK_INERTIA_DECAY;
+        touchLookState.targetPitchDelta *= LOOK_INERTIA_DECAY;
+
         lastLookX = touch.clientX;
         lastLookY = touch.clientY;
     });
+
+    const clearLook = () => {
+        lastLookX = undefined;
+        lastLookY = undefined;
+    };
+
+    lookZone.addEventListener('touchend', clearLook);
+    lookZone.addEventListener('touchcancel', clearLook);
 
     const btnMap = [
         { id: 'btn-sprint', key: 'shift' },
@@ -540,9 +559,21 @@ function updateTouchInput(dt) {
 
     const smoothing = Math.min(1, dt * 12);
 
+    const lookSmoothing = Math.min(1, dt * 18);
+    const lookInertia = Math.max(0, 1 - dt * 10);
+
     input.drive.x = THREE.MathUtils.lerp(input.drive.x, input.driveTarget.x, smoothing);
     input.drive.y = THREE.MathUtils.lerp(input.drive.y, input.driveTarget.y, smoothing);
     input.drive.magnitude = THREE.MathUtils.lerp(input.drive.magnitude, input.driveTarget.magnitude, smoothing);
+
+    touchLookState.velocityYaw = THREE.MathUtils.lerp(touchLookState.velocityYaw, touchLookState.targetYawDelta, lookSmoothing);
+    touchLookState.velocityPitch = THREE.MathUtils.lerp(touchLookState.velocityPitch, touchLookState.targetPitchDelta, lookSmoothing);
+
+    cameraAngles.yaw += touchLookState.velocityYaw;
+    cameraAngles.pitch = Math.max(-Math.PI/2.5, Math.min(Math.PI/2.5, cameraAngles.pitch + touchLookState.velocityPitch));
+
+    touchLookState.targetYawDelta *= lookInertia;
+    touchLookState.targetPitchDelta *= lookInertia;
 
     if (Math.abs(input.drive.x) < 0.001) input.drive.x = 0;
     if (Math.abs(input.drive.y) < 0.001) input.drive.y = 0;
