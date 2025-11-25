@@ -171,11 +171,11 @@
         .joystick-base {
             position: absolute;
             bottom: 50px; left: 50px;
-            width: 120px; height: 120px;
+            width: 200px; height: 200px;
             background: rgba(255, 255, 255, 0.1);
             border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
-            display: none; 
+            display: none;
         }
         .joystick-stick {
             position: absolute;
@@ -341,7 +341,16 @@ let physicsObjects = [];
 let vehicles = []; 
 let pedestrians = [];
 let tracerLines = [];
-let input = { w: false, a: false, s: false, d: false, shift: false, space: false };
+let input = {
+    w: false,
+    a: false,
+    s: false,
+    d: false,
+    shift: false,
+    space: false,
+    drive: { x: 0, y: 0, magnitude: 0 },
+    driveTarget: { x: 0, y: 0, magnitude: 0 }
+};
 let gameState = { wantedLevel: 0, cash: 0, isDriving: false, wasted: false, activeMission: null };
 let cameraAngles = { yaw: 0, pitch: 0.2 };
 let minimapCtx;
@@ -408,47 +417,64 @@ function isTouchDevice() {
 
 function initTouchControls() {
     document.getElementById('touch-controls').style.display = 'block';
-    
+
     const joystickZone = document.getElementById('zone-joystick');
     const base = document.getElementById('joystick-base');
     const stick = document.getElementById('joystick-stick');
+    const JOYSTICK_RADIUS = 90;
+    const DEADZONE = 10;
     let joystickActive = false;
     let startX, startY;
+
+    const setDriveTarget = (x, y, magnitude) => {
+        input.driveTarget.x = x;
+        input.driveTarget.y = y;
+        input.driveTarget.magnitude = magnitude;
+    };
 
     joystickZone.addEventListener('touchstart', (e) => {
         e.preventDefault();
         const touch = e.changedTouches[0];
         startX = touch.clientX;
         startY = touch.clientY;
-        
+
         base.style.display = 'block';
-        base.style.left = (startX - 60) + 'px';
-        base.style.top = (startY - 60) + 'px';
+        base.style.width = base.style.height = `${JOYSTICK_RADIUS * 2}px`;
+        base.style.left = (startX - JOYSTICK_RADIUS) + 'px';
+        base.style.top = (startY - JOYSTICK_RADIUS) + 'px';
         stick.style.transform = `translate(-50%, -50%)`;
         joystickActive = true;
+        setDriveTarget(0, 0, 0);
     }, {passive: false});
 
     joystickZone.addEventListener('touchmove', (e) => {
         if (!joystickActive) return;
         e.preventDefault();
         const touch = e.changedTouches[0];
-        
-        const maxDist = 40;
+
         let dx = touch.clientX - startX;
         let dy = touch.clientY - startY;
         const dist = Math.sqrt(dx*dx + dy*dy);
-        
-        if (dist > maxDist) {
-            dx = (dx / dist) * maxDist;
-            dy = (dy / dist) * maxDist;
+
+        const clampedDist = Math.min(dist, JOYSTICK_RADIUS);
+        if (dist > 0) {
+            dx = (dx / dist) * clampedDist;
+            dy = (dy / dist) * clampedDist;
         }
+
+        const hasInput = clampedDist > DEADZONE;
+        const magnitude = hasInput ? (clampedDist - DEADZONE) / (JOYSTICK_RADIUS - DEADZONE) : 0;
+        const normX = hasInput ? (dx / clampedDist) : 0;
+        const normY = hasInput ? (dy / clampedDist) : 0;
+
+        setDriveTarget(normX * magnitude, normY * magnitude, magnitude);
 
         stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
 
-        input.w = dy < -10;
-        input.s = dy > 10;
-        input.a = dx < -10;
-        input.d = dx > 10;
+        input.w = normY < -0.25;
+        input.s = normY > 0.25;
+        input.a = normX < -0.25;
+        input.d = normX > 0.25;
 
     }, {passive: false});
 
@@ -457,6 +483,7 @@ function initTouchControls() {
         joystickActive = false;
         base.style.display = 'none';
         input.w = input.s = input.a = input.d = false;
+        setDriveTarget(0, 0, 0);
     };
 
     joystickZone.addEventListener('touchend', endJoystick);
@@ -496,9 +523,9 @@ function initTouchControls() {
     });
 
     const btnCar = document.getElementById('btn-car');
-    btnCar.addEventListener('touchstart', (e) => { 
-        e.preventDefault(); 
-        tryEnterExitVehicle(); 
+    btnCar.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        tryEnterExitVehicle();
     });
 
     const btnShoot = document.getElementById('btn-shoot');
@@ -506,6 +533,20 @@ function initTouchControls() {
         e.preventDefault();
         shootGun();
     });
+}
+
+function updateTouchInput(dt) {
+    if (!isTouchDevice()) return;
+
+    const smoothing = Math.min(1, dt * 12);
+
+    input.drive.x = THREE.MathUtils.lerp(input.drive.x, input.driveTarget.x, smoothing);
+    input.drive.y = THREE.MathUtils.lerp(input.drive.y, input.driveTarget.y, smoothing);
+    input.drive.magnitude = THREE.MathUtils.lerp(input.drive.magnitude, input.driveTarget.magnitude, smoothing);
+
+    if (Math.abs(input.drive.x) < 0.001) input.drive.x = 0;
+    if (Math.abs(input.drive.y) < 0.001) input.drive.y = 0;
+    if (input.drive.magnitude < 0.001) input.drive.magnitude = 0;
 }
 
 // --- MISSION SYSTEM ---
@@ -1080,14 +1121,16 @@ function updateVehicles(dt) {
     vehicles.forEach(v => {
         if (v === activeVehicle) {
             // Player Control
-            const acc = input.w ? 1 : (input.s ? -0.5 : 0);
-            const turn = input.a ? 1 : (input.d ? -1 : 0);
+            const hasDriveVector = input.drive.magnitude > 0.01;
+            const forwardInput = hasDriveVector ? Math.max(0, -input.drive.y) : (input.w ? 1 : 0);
+            const reverseInput = hasDriveVector ? Math.max(0, input.drive.y) : (input.s ? 1 : 0);
+            const turn = hasDriveVector ? THREE.MathUtils.clamp(-input.drive.x, -1, 1) : (input.a ? 1 : (input.d ? -1 : 0));
             const brake = input.space;
             const nitro = input.shift;
 
             let maxSpeed = CONFIG.carSpeed * (nitro ? 1.5 : 1);
-            if (acc > 0) v.speed += dt * 30;
-            else if (acc < 0) v.speed -= dt * 20;
+            if (forwardInput > 0) v.speed += dt * 30 * forwardInput;
+            else if (reverseInput > 0) v.speed -= dt * 20 * reverseInput;
             else v.speed *= 0.98;
 
             if (brake) v.speed *= 0.92;
@@ -1457,6 +1500,8 @@ function animate() {
         renderer.render(scene, camera);
         return;
     }
+
+    updateTouchInput(dt);
 
     for(let i=tracerLines.length-1; i>=0; i--) {
         tracerLines[i].life -= dt;
