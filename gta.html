@@ -492,12 +492,12 @@ function initTouchControls() {
 
     const lookZone = document.getElementById('zone-look');
     let lastLookX, lastLookY;
-    const LOOK_YAW_SENSITIVITY = 0.0045;
-    const LOOK_PITCH_SENSITIVITY = 0.0035;
+    const LOOK_YAW_SENSITIVITY = 0.007;
+    const LOOK_PITCH_SENSITIVITY = 0.0055;
     const LOOK_DELTA_CAP = 50;
-    const LOOK_FILTER_STRENGTH = 0.3;
-    const LOOK_INERTIA_DECAY = 0.8;
-    const MOBILE_LOOK_MULTIPLIER = 0.8;
+    const LOOK_FILTER_STRENGTH = 0.45;
+    const LOOK_INERTIA_DECAY = 0.9;
+    const MOBILE_LOOK_MULTIPLIER = 1.15;
 
     lookZone.addEventListener('touchstart', (e) => {
         const touch = e.changedTouches[0];
