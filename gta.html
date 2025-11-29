@@ -605,6 +605,8 @@ const CONFIG = {
     missions: defaultCity.missions
 };
 
+let activeCityConfig = defaultCity;
+
 // --- GLOBAL VARIABLES ---
 let scene, camera, renderer, clock;
 let player, playerBodyParts = {};
@@ -639,6 +641,7 @@ function applyCityConfig(cityKey) {
     const city = getCityConfig(resolvedKey);
     selectedCityKey = resolvedKey;
     gameState.selectedCity = resolvedKey;
+    activeCityConfig = city;
     CONFIG.worldSize = city.world.worldSize;
     CONFIG.gridSize = city.world.gridSize;
     CONFIG.buildingDensity = city.world.buildingDensity;
@@ -1202,7 +1205,7 @@ function init() {
     dirLight.shadow.camera.bottom = -200;
     scene.add(dirLight);
 
-    generateCity();
+    generateCity(activeCityConfig);
     initMissions();
     createPlayer();
     
@@ -1238,28 +1241,30 @@ function createBuildingTexture() {
     return tex;
 }
 
-function createRoadTexture() {
+function createRoadTexture(city) {
+    const { world: { worldSize, gridSize }, colors } = city;
     const canvasSize = 2048;
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = canvasSize;
     const ctx = canvas.getContext('2d');
 
-    const worldScale = canvasSize / CONFIG.worldSize;
+    const worldScale = canvasSize / worldSize;
     const halfSize = canvasSize / 2;
-    const roadWidth = Math.max(12, CONFIG.gridSize * 0.35) * worldScale;
+    const roadWidth = Math.max(12, gridSize * 0.35) * worldScale;
 
-    ctx.fillStyle = '#1b1b1b';
+    const baseGround = new THREE.Color(colors.ground || 0x1b1b1b);
+    ctx.fillStyle = `#${baseGround.getHexString()}`;
     ctx.fillRect(0, 0, canvasSize, canvasSize);
 
-    const roadColor = '#2f2f2f';
-    const laneColor = '#e8e8e8';
+    const roadColor = `#${baseGround.clone().multiplyScalar(0.85).getHexString()}`;
+    const laneColor = `#${new THREE.Color(colors.neonBlue || 0xe8e8e8).offsetHSL(0, -0.05, 0.15).getHexString()}`;
     const dash = 20 * worldScale;
     const gap = 14 * worldScale;
     const lineWidth = Math.max(2, 3 * worldScale);
 
     const roadCoords = [];
-    const halfExtent = (CONFIG.worldSize / 2) - CONFIG.gridSize;
-    for(let c = -halfExtent; c <= halfExtent; c += CONFIG.gridSize) roadCoords.push(c);
+    const halfExtent = (worldSize / 2) - gridSize;
+    for(let c = -halfExtent; c <= halfExtent; c += gridSize) roadCoords.push(c);
 
     roadCoords.forEach(coord => {
         const center = halfSize + coord * worldScale;
@@ -1294,27 +1299,29 @@ function createRoadTexture() {
     return tex;
 }
 
-function generateCity() {
-    const roadTexture = createRoadTexture();
-    const roadMat = new THREE.MeshStandardMaterial({ map: roadTexture, roughness: 0.8 });
+function generateCity(cityConfig = activeCityConfig || defaultCity) {
+    const city = cityConfig || defaultCity;
+    const { world: { worldSize, gridSize, buildingDensity }, colors, vegetation } = city;
+
+    const roadTexture = createRoadTexture(city);
+    const roadMat = new THREE.MeshStandardMaterial({ map: roadTexture, roughness: 0.8, color: colors.ground || 0x222222 });
     // PERFORMANCE FIX: Single shared material and texture for all buildings
     const buildingTex = createBuildingTexture();
     const buildingMat = new THREE.MeshStandardMaterial({ map: buildingTex, roughness: 0.3 });
 
-    const groundGeo = new THREE.PlaneGeometry(CONFIG.worldSize, CONFIG.worldSize);
+    const groundGeo = new THREE.PlaneGeometry(worldSize, worldSize);
     const ground = new THREE.Mesh(groundGeo, roadMat);
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     scene.add(ground);
     physicsObjects.push({ type: 'ground', y: 0 });
 
-    const gridSize = CONFIG.gridSize;
     const streetWidth = Math.max(12, gridSize * 0.35);
-    const halfExtent = (CONFIG.worldSize / 2) - gridSize;
+    const halfExtent = (worldSize / 2) - gridSize;
 
     // Building Instancing Setup
     const buildingBoxGeo = new THREE.BoxGeometry(1, 1, 1);
-    const approxPlots = Math.floor((CONFIG.worldSize / gridSize) ** 2 * CONFIG.buildingDensity);
+    const approxPlots = Math.floor((worldSize / gridSize) ** 2 * buildingDensity);
     const maxBuildings = Math.min(800, Math.max(300, approxPlots));
     const buildingMesh = new THREE.InstancedMesh(buildingBoxGeo, buildingMat, maxBuildings);
     buildingMesh.castShadow = true;
@@ -1324,7 +1331,7 @@ function generateCity() {
 
     // Neon Trims Instancing
     const trimGeo = new THREE.BoxGeometry(1, 0.5, 1);
-    const trimMat = new THREE.MeshBasicMaterial({ color: CONFIG.colors.neonPink });
+    const trimMat = new THREE.MeshBasicMaterial({ color: colors.neonPink });
     const trimMesh = new THREE.InstancedMesh(trimGeo, trimMat, maxBuildings);
     scene.add(trimMesh);
     let trimIdx = 0;
@@ -1332,12 +1339,14 @@ function generateCity() {
     for (let x = -halfExtent; x <= halfExtent; x += gridSize) {
         for (let z = -halfExtent; z <= halfExtent; z += gridSize) {
             let distToCenter = Math.sqrt(x*x + z*z);
-            if (Math.random() > CONFIG.buildingDensity && distToCenter > gridSize * 1.25) continue;
+            if (Math.random() > buildingDensity && distToCenter > gridSize * 1.25) continue;
             if (Math.abs(x) < gridSize * 0.5 && Math.abs(z) < gridSize * 0.5) continue;
 
-            let height = 5 + Math.random() * 15;
+            const baseHeight = Math.max(5, gridSize * 0.2);
+            const variability = Math.max(15, gridSize * 0.9);
+            let height = baseHeight + Math.random() * variability;
             let width = Math.max(6, gridSize - streetWidth);
-            if(distToCenter < gridSize * 3) height = 40 + Math.random() * 80;
+            if(distToCenter < gridSize * 3) height = Math.max(baseHeight * 2, gridSize * 1.2) + Math.random() * Math.max(80, gridSize * 2);
 
             if (buildingIdx < maxBuildings) {
                 dummy.position.set(x, height / 2, z);
@@ -1367,12 +1376,14 @@ function generateCity() {
     
     // Tree Instancing Setup
     const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 6, 6);
-    const trunkMat = new THREE.MeshStandardMaterial({ color: CONFIG.vegetation.trunkColor || 0x8B4513 });
+    const trunkMat = new THREE.MeshStandardMaterial({ color: vegetation.trunkColor || colors.ground || 0x8B4513 });
     const leavesGeo = new THREE.ConeGeometry(2.5, 1, 6);
-    const leafPalette = CONFIG.vegetation.leafColors || [0x228b22];
+    const leafPalette = (vegetation.leafColors && vegetation.leafColors.length)
+        ? vegetation.leafColors
+        : [colors.neonBlue, colors.neonPink, colors.ground].filter(Boolean);
     const leavesMat = new THREE.MeshStandardMaterial({ color: leafPalette[0] || 0x228b22, vertexColors: true });
 
-    const maxTrees = CONFIG.vegetation.maxTrees || 200;
+    const maxTrees = vegetation.maxTrees || 200;
     const trunkMeshInstanced = new THREE.InstancedMesh(trunkGeo, trunkMat, maxTrees);
     const leavesMeshInstanced = new THREE.InstancedMesh(leavesGeo, leavesMat, maxTrees);
     leavesMeshInstanced.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(maxTrees * 3), 3);
@@ -1382,8 +1393,8 @@ function generateCity() {
 
     let treeIdx = 0;
     for(let i=0; i<maxTrees; i++) {
-        let x = (Math.random() - 0.5) * CONFIG.worldSize * 0.6;
-        let z = (Math.random() - 0.5) * CONFIG.worldSize * 0.6;
+        let x = (Math.random() - 0.5) * worldSize * 0.6;
+        let z = (Math.random() - 0.5) * worldSize * 0.6;
         if(checkCollisionWithBuildings(x, z, 2)) continue;
         
         dummy.position.set(x, 3, z);
