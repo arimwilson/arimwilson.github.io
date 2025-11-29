@@ -443,29 +443,166 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 
 // --- CONFIGURATION & CONSTANTS ---
 const CITY_CONFIGS = {
-    la: { name: 'Los Angeles', preview: 'Neon sunsets & wide freeways', description: 'Cruise neon-drenched boulevards, palm-lined freeways, and hazy sunsets straight out of an action flick.', colors: { skyTop: 0x4477bb, skyBottom: 0xffaa66, ground: 0x222222, neonPink: 0xff0055, neonBlue: 0x00d2ff } },
-    nyc: { name: 'New York City', preview: 'Skyscrapers & steam vents', description: 'Tight grids, towering glass, and an endless buzz echoing up from the subway grates.', colors: { skyTop: 0x1c2b3f, skyBottom: 0xffd166, ground: 0x1b1b1b, neonPink: 0xff3366, neonBlue: 0x53a0fd } },
-    miami: { name: 'Miami', preview: 'Art deco glow', description: 'Pastel art deco strips, turquoise waters, and humid midnight rides past neon palms.', colors: { skyTop: 0x2c7da0, skyBottom: 0xff8fa3, ground: 0x1e2a2f, neonPink: 0xff5f9e, neonBlue: 0x53f3ff } },
-    tokyo: { name: 'Tokyo', preview: 'Rain-slicked alleys', description: 'Blade-runner streets with towering billboards, lantern alleys, and reflections on wet asphalt.', colors: { skyTop: 0x0f1b2c, skyBottom: 0x7f5af0, ground: 0x111111, neonPink: 0xff4d6d, neonBlue: 0x5af8ff } },
-    paris: { name: 'Paris', preview: 'Golden hours & stone', description: 'Cobblestone avenues, riverfront drives, and gold-lit monuments cutting through the mist.', colors: { skyTop: 0x3c4f76, skyBottom: 0xf2c57c, ground: 0x2b2620, neonPink: 0xff7f66, neonBlue: 0x9ddafc } },
-    london: { name: 'London', preview: 'Fog & fast lanes', description: 'Moody skies, Thames-side loops, and the glow of theater rows off the rain.', colors: { skyTop: 0x2a3140, skyBottom: 0xc4d6e5, ground: 0x1f2224, neonPink: 0xff4f81, neonBlue: 0x8cc7ff } },
-    rio: { name: 'Rio de Janeiro', preview: 'Beachfront chaos', description: 'Beachfront sweeps, jungle-backed hills, and carnival lights pouring into the avenues.', colors: { skyTop: 0x2f6b46, skyBottom: 0xffd166, ground: 0x1f2b24, neonPink: 0xff6b6b, neonBlue: 0x5ef3c7 } },
-    dubai: { name: 'Dubai', preview: 'Chrome & desert', description: 'Glass spires in desert heat, desert motorways, and hyper-polished neon malls.', colors: { skyTop: 0x1f3a4a, skyBottom: 0xffc46b, ground: 0x1d1a17, neonPink: 0xff3c6f, neonBlue: 0x62d5ff } },
-    sydney: { name: 'Sydney', preview: 'Harbor lights', description: 'Harbor bridges, cliffside drives, and crisp ocean air under electric blues.', colors: { skyTop: 0x234a67, skyBottom: 0x99d6ff, ground: 0x1f2d33, neonPink: 0xff4c7f, neonBlue: 0x7cd5ff } },
-    chicago: { name: 'Chicago', preview: 'Windy grid', description: 'Steel bridges, elevated trains, and hard-edged grids pulsing with jazz neon.', colors: { skyTop: 0x1f3a52, skyBottom: 0xffb347, ground: 0x202428, neonPink: 0xff5c5c, neonBlue: 0x6cc0ff } }
+    la: {
+        name: 'Los Angeles',
+        preview: 'Neon sunsets & wide freeways',
+        description: 'Cruise neon-drenched boulevards, palm-lined freeways, and hazy sunsets straight out of an action flick.',
+        colors: { skyTop: 0x4477bb, skyBottom: 0xffaa66, ground: 0x222222, neonPink: 0xff0055, neonBlue: 0x00d2ff },
+        world: { worldSize: 1200, gridSize: 40, buildingDensity: 0.8 },
+        vegetation: { trunkColor: 0x8B4513, leafColors: [0x228b22, 0x2ecc71, 0x6ab04c], maxTrees: 200 },
+        missions: [
+            { color: 0xff0000, start: { x: 5, z: 5 }, end: { x: -200, z: -200 } },
+            { color: 0x00ff00, start: { x: -100, z: 100 }, end: { x: 100, z: -100 } },
+            { color: 0x0000ff, start: { x: 150, z: -150 }, end: { x: -150, z: 50 } },
+            { color: 0xffff00, start: { x: -200, z: -50 }, end: { x: 50, z: 200 } },
+            { color: 0xff00ff, start: { x: 200, z: 200 }, end: { x: 0, z: 0 } }
+        ]
+    },
+    nyc: {
+        name: 'New York City',
+        preview: 'Skyscrapers & steam vents',
+        description: 'Tight grids, towering glass, and an endless buzz echoing up from the subway grates.',
+        colors: { skyTop: 0x1c2b3f, skyBottom: 0xffd166, ground: 0x1b1b1b, neonPink: 0xff3366, neonBlue: 0x53a0fd },
+        world: { worldSize: 1100, gridSize: 35, buildingDensity: 0.9 },
+        vegetation: { trunkColor: 0x5d4037, leafColors: [0x1b5e20, 0x2e7d32, 0x558b2f], maxTrees: 160 },
+        missions: [
+            { color: 0x8be9fd, start: { x: -140, z: 140 }, end: { x: 140, z: -160 } },
+            { color: 0xff79c6, start: { x: 120, z: -90 }, end: { x: -220, z: 60 } },
+            { color: 0xffb86c, start: { x: 40, z: 200 }, end: { x: -40, z: -220 } }
+        ]
+    },
+    miami: {
+        name: 'Miami',
+        preview: 'Art deco glow',
+        description: 'Pastel art deco strips, turquoise waters, and humid midnight rides past neon palms.',
+        colors: { skyTop: 0x2c7da0, skyBottom: 0xff8fa3, ground: 0x1e2a2f, neonPink: 0xff5f9e, neonBlue: 0x53f3ff },
+        world: { worldSize: 1150, gridSize: 36, buildingDensity: 0.75 },
+        vegetation: { trunkColor: 0xa76a3e, leafColors: [0x1abc9c, 0x16a085, 0x27ae60], maxTrees: 240 },
+        missions: [
+            { color: 0x00ffc3, start: { x: -80, z: -80 }, end: { x: 220, z: 120 } },
+            { color: 0xff9ff3, start: { x: 160, z: 160 }, end: { x: -60, z: -200 } },
+            { color: 0xffd166, start: { x: -200, z: 60 }, end: { x: 60, z: -220 } }
+        ]
+    },
+    tokyo: {
+        name: 'Tokyo',
+        preview: 'Rain-slicked alleys',
+        description: 'Blade-runner streets with towering billboards, lantern alleys, and reflections on wet asphalt.',
+        colors: { skyTop: 0x0f1b2c, skyBottom: 0x7f5af0, ground: 0x111111, neonPink: 0xff4d6d, neonBlue: 0x5af8ff },
+        world: { worldSize: 1050, gridSize: 32, buildingDensity: 0.95 },
+        vegetation: { trunkColor: 0x4e342e, leafColors: [0x1f4068, 0x2d6cdf, 0x5f27cd], maxTrees: 140 },
+        missions: [
+            { color: 0x7c3aed, start: { x: -120, z: 40 }, end: { x: 220, z: -120 } },
+            { color: 0xff5370, start: { x: 90, z: -200 }, end: { x: -140, z: 200 } },
+            { color: 0x64ffda, start: { x: 200, z: 80 }, end: { x: -200, z: -80 } }
+        ]
+    },
+    paris: {
+        name: 'Paris',
+        preview: 'Golden hours & stone',
+        description: 'Cobblestone avenues, riverfront drives, and gold-lit monuments cutting through the mist.',
+        colors: { skyTop: 0x3c4f76, skyBottom: 0xf2c57c, ground: 0x2b2620, neonPink: 0xff7f66, neonBlue: 0x9ddafc },
+        world: { worldSize: 1000, gridSize: 34, buildingDensity: 0.7 },
+        vegetation: { trunkColor: 0x8d6e63, leafColors: [0x556b2f, 0x6b8e23, 0x8f9779], maxTrees: 180 },
+        missions: [
+            { color: 0xf2c57c, start: { x: 40, z: 160 }, end: { x: -160, z: -60 } },
+            { color: 0xff7f66, start: { x: -140, z: -120 }, end: { x: 200, z: 140 } }
+        ]
+    },
+    london: {
+        name: 'London',
+        preview: 'Fog & fast lanes',
+        description: 'Moody skies, Thames-side loops, and the glow of theater rows off the rain.',
+        colors: { skyTop: 0x2a3140, skyBottom: 0xc4d6e5, ground: 0x1f2224, neonPink: 0xff4f81, neonBlue: 0x8cc7ff },
+        world: { worldSize: 950, gridSize: 33, buildingDensity: 0.82 },
+        vegetation: { trunkColor: 0x5d4037, leafColors: [0x2f4858, 0x376996, 0x7da0b8], maxTrees: 170 },
+        missions: [
+            { color: 0x8cc7ff, start: { x: -80, z: -150 }, end: { x: 160, z: 120 } },
+            { color: 0xff4f81, start: { x: 150, z: 70 }, end: { x: -180, z: -40 } },
+            { color: 0xe0c3fc, start: { x: 0, z: 200 }, end: { x: 0, z: -200 } }
+        ]
+    },
+    rio: {
+        name: 'Rio de Janeiro',
+        preview: 'Beachfront chaos',
+        description: 'Beachfront sweeps, jungle-backed hills, and carnival lights pouring into the avenues.',
+        colors: { skyTop: 0x2f6b46, skyBottom: 0xffd166, ground: 0x1f2b24, neonPink: 0xff6b6b, neonBlue: 0x5ef3c7 },
+        world: { worldSize: 1150, gridSize: 38, buildingDensity: 0.78 },
+        vegetation: { trunkColor: 0x8b5a2b, leafColors: [0x2ecc71, 0x27ae60, 0x1e8449], maxTrees: 260 },
+        missions: [
+            { color: 0xff6b6b, start: { x: 200, z: -120 }, end: { x: -120, z: 200 } },
+            { color: 0x5ef3c7, start: { x: -160, z: 80 }, end: { x: 160, z: -200 } },
+            { color: 0xffd166, start: { x: 0, z: -200 }, end: { x: 0, z: 200 } }
+        ]
+    },
+    dubai: {
+        name: 'Dubai',
+        preview: 'Chrome & desert',
+        description: 'Glass spires in desert heat, desert motorways, and hyper-polished neon malls.',
+        colors: { skyTop: 0x1f3a4a, skyBottom: 0xffc46b, ground: 0x1d1a17, neonPink: 0xff3c6f, neonBlue: 0x62d5ff },
+        world: { worldSize: 1250, gridSize: 42, buildingDensity: 0.85 },
+        vegetation: { trunkColor: 0xc39b77, leafColors: [0xc6ffdd, 0xfbd786, 0xf7797d], maxTrees: 120 },
+        missions: [
+            { color: 0xfbd786, start: { x: 180, z: 140 }, end: { x: -200, z: -140 } },
+            { color: 0x62d5ff, start: { x: -60, z: -200 }, end: { x: 200, z: 60 } }
+        ]
+    },
+    sydney: {
+        name: 'Sydney',
+        preview: 'Harbor lights',
+        description: 'Harbor bridges, cliffside drives, and crisp ocean air under electric blues.',
+        colors: { skyTop: 0x234a67, skyBottom: 0x99d6ff, ground: 0x1f2d33, neonPink: 0xff4c7f, neonBlue: 0x7cd5ff },
+        world: { worldSize: 1080, gridSize: 36, buildingDensity: 0.76 },
+        vegetation: { trunkColor: 0x6d4c41, leafColors: [0x1b9aaa, 0x61c0bf, 0xa8d0e6], maxTrees: 210 },
+        missions: [
+            { color: 0x7cd5ff, start: { x: -120, z: 120 }, end: { x: 160, z: -160 } },
+            { color: 0xff4c7f, start: { x: 180, z: 0 }, end: { x: -180, z: 0 } }
+        ]
+    },
+    chicago: {
+        name: 'Chicago',
+        preview: 'Windy grid',
+        description: 'Steel bridges, elevated trains, and hard-edged grids pulsing with jazz neon.',
+        colors: { skyTop: 0x1f3a52, skyBottom: 0xffb347, ground: 0x202428, neonPink: 0xff5c5c, neonBlue: 0x6cc0ff },
+        world: { worldSize: 1020, gridSize: 34, buildingDensity: 0.88 },
+        vegetation: { trunkColor: 0x5d4037, leafColors: [0x1b5e20, 0x2e7d32, 0x66bb6a], maxTrees: 175 },
+        missions: [
+            { color: 0x6cc0ff, start: { x: -150, z: -50 }, end: { x: 200, z: 100 } },
+            { color: 0xff5c5c, start: { x: 100, z: 180 }, end: { x: -200, z: -120 } }
+        ]
+    }
 };
 
 const DEFAULT_CITY_KEY = 'la';
 
+function getCityConfig(cityKey) {
+    const base = CITY_CONFIGS[DEFAULT_CITY_KEY];
+    const city = CITY_CONFIGS[cityKey] || base;
+    return {
+        ...base,
+        ...city,
+        colors: { ...base.colors, ...city.colors },
+        world: { ...base.world, ...(city.world || {}) },
+        vegetation: { ...base.vegetation, ...(city.vegetation || {}) },
+        missions: city.missions || base.missions
+    };
+}
+
+const defaultCity = getCityConfig(DEFAULT_CITY_KEY);
+
 const CONFIG = {
-    worldSize: 1200,
+    worldSize: defaultCity.world.worldSize,
+    gridSize: defaultCity.world.gridSize,
+    buildingDensity: defaultCity.world.buildingDensity,
     chunkSize: 50,
     gravity: 30,
     playerSpeed: 10,
     sprintSpeed: 18,
     carSpeed: 70,
     carTurnSpeed: 2.5,
-    colors: { ...CITY_CONFIGS[DEFAULT_CITY_KEY].colors }
+    colors: { ...defaultCity.colors },
+    vegetation: { ...defaultCity.vegetation },
+    missions: defaultCity.missions
 };
 
 // --- GLOBAL VARIABLES ---
@@ -499,9 +636,14 @@ let hasStarted = false;
 
 function applyCityConfig(cityKey) {
     const resolvedKey = CITY_CONFIGS[cityKey] ? cityKey : DEFAULT_CITY_KEY;
-    const city = CITY_CONFIGS[resolvedKey];
+    const city = getCityConfig(resolvedKey);
     selectedCityKey = resolvedKey;
     gameState.selectedCity = resolvedKey;
+    CONFIG.worldSize = city.world.worldSize;
+    CONFIG.gridSize = city.world.gridSize;
+    CONFIG.buildingDensity = city.world.buildingDensity;
+    CONFIG.vegetation = { ...city.vegetation };
+    CONFIG.missions = city.missions;
     Object.assign(CONFIG.colors, city.colors);
     document.title = `Grand Theft Auto VI: ${city.name} Vibes`;
     const loadingTitle = document.querySelector('#loading h1');
@@ -802,16 +944,18 @@ function updateTouchInput(dt) {
 
 // --- MISSION SYSTEM ---
 function initMissions() {
+    if (missionMarkersGroup) {
+        scene.remove(missionMarkersGroup);
+    }
+    missions = [];
     missionMarkersGroup = new THREE.Group();
     scene.add(missionMarkersGroup);
 
-    const missionConfigs = [
-        { color: 0xff0000, start: {x: 5, z: 5}, end: {x: -200, z: -200} }, 
-        { color: 0x00ff00, start: {x: -100, z: 100}, end: {x: 100, z: -100} },
-        { color: 0x0000ff, start: {x: 150, z: -150}, end: {x: -150, z: 50} },
-        { color: 0xffff00, start: {x: -200, z: -50}, end: {x: 50, z: 200} },
-        { color: 0xff00ff, start: {x: 200, z: 200}, end: {x: 0, z: 0} }
-    ];
+    const missionConfigs = (CONFIG.missions || []).map(cfg => ({
+        color: cfg.color,
+        start: { ...cfg.start },
+        end: { ...cfg.end }
+    }));
 
     missionConfigs.forEach((cfg, index) => {
         // Validate Start Position
@@ -1102,7 +1246,7 @@ function createRoadTexture() {
 
     const worldScale = canvasSize / CONFIG.worldSize;
     const halfSize = canvasSize / 2;
-    const roadWidth = 14 * worldScale;
+    const roadWidth = Math.max(12, CONFIG.gridSize * 0.35) * worldScale;
 
     ctx.fillStyle = '#1b1b1b';
     ctx.fillRect(0, 0, canvasSize, canvasSize);
@@ -1114,7 +1258,8 @@ function createRoadTexture() {
     const lineWidth = Math.max(2, 3 * worldScale);
 
     const roadCoords = [];
-    for(let c = -380; c <= 380; c += 40) roadCoords.push(c);
+    const halfExtent = (CONFIG.worldSize / 2) - CONFIG.gridSize;
+    for(let c = -halfExtent; c <= halfExtent; c += CONFIG.gridSize) roadCoords.push(c);
 
     roadCoords.forEach(coord => {
         const center = halfSize + coord * worldScale;
@@ -1163,12 +1308,14 @@ function generateCity() {
     scene.add(ground);
     physicsObjects.push({ type: 'ground', y: 0 });
 
-    const gridSize = 40;
-    const streetWidth = 14;
+    const gridSize = CONFIG.gridSize;
+    const streetWidth = Math.max(12, gridSize * 0.35);
+    const halfExtent = (CONFIG.worldSize / 2) - gridSize;
 
     // Building Instancing Setup
     const buildingBoxGeo = new THREE.BoxGeometry(1, 1, 1);
-    const maxBuildings = 500;
+    const approxPlots = Math.floor((CONFIG.worldSize / gridSize) ** 2 * CONFIG.buildingDensity);
+    const maxBuildings = Math.min(800, Math.max(300, approxPlots));
     const buildingMesh = new THREE.InstancedMesh(buildingBoxGeo, buildingMat, maxBuildings);
     buildingMesh.castShadow = true;
     buildingMesh.receiveShadow = true;
@@ -1182,15 +1329,15 @@ function generateCity() {
     scene.add(trimMesh);
     let trimIdx = 0;
 
-    for (let x = -400; x <= 400; x += gridSize) {
-        for (let z = -400; z <= 400; z += gridSize) {
+    for (let x = -halfExtent; x <= halfExtent; x += gridSize) {
+        for (let z = -halfExtent; z <= halfExtent; z += gridSize) {
             let distToCenter = Math.sqrt(x*x + z*z);
-            if (Math.random() > 0.8 && distToCenter > 50) continue; 
-            if (Math.abs(x) < 20 && Math.abs(z) < 20) continue;
+            if (Math.random() > CONFIG.buildingDensity && distToCenter > gridSize * 1.25) continue;
+            if (Math.abs(x) < gridSize * 0.5 && Math.abs(z) < gridSize * 0.5) continue;
 
             let height = 5 + Math.random() * 15;
-            let width = gridSize - streetWidth; 
-            if(distToCenter < 120) height = 40 + Math.random() * 80;
+            let width = Math.max(6, gridSize - streetWidth);
+            if(distToCenter < gridSize * 3) height = 40 + Math.random() * 80;
 
             if (buildingIdx < maxBuildings) {
                 dummy.position.set(x, height / 2, z);
@@ -1220,21 +1367,23 @@ function generateCity() {
     
     // Tree Instancing Setup
     const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 6, 6);
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+    const trunkMat = new THREE.MeshStandardMaterial({ color: CONFIG.vegetation.trunkColor || 0x8B4513 });
     const leavesGeo = new THREE.ConeGeometry(2.5, 1, 6);
-    const leavesMat = new THREE.MeshStandardMaterial({ color: 0x228b22 });
-    
-    const maxTrees = 200;
+    const leafPalette = CONFIG.vegetation.leafColors || [0x228b22];
+    const leavesMat = new THREE.MeshStandardMaterial({ color: leafPalette[0] || 0x228b22, vertexColors: true });
+
+    const maxTrees = CONFIG.vegetation.maxTrees || 200;
     const trunkMeshInstanced = new THREE.InstancedMesh(trunkGeo, trunkMat, maxTrees);
     const leavesMeshInstanced = new THREE.InstancedMesh(leavesGeo, leavesMat, maxTrees);
+    leavesMeshInstanced.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(maxTrees * 3), 3);
     trunkMeshInstanced.castShadow = true;
     scene.add(trunkMeshInstanced);
     scene.add(leavesMeshInstanced);
-    
+
     let treeIdx = 0;
     for(let i=0; i<maxTrees; i++) {
-        let x = (Math.random() - 0.5) * 700;
-        let z = (Math.random() - 0.5) * 700;
+        let x = (Math.random() - 0.5) * CONFIG.worldSize * 0.6;
+        let z = (Math.random() - 0.5) * CONFIG.worldSize * 0.6;
         if(checkCollisionWithBuildings(x, z, 2)) continue;
         
         dummy.position.set(x, 3, z);
@@ -1246,10 +1395,13 @@ function generateCity() {
         dummy.position.set(x, 6, z); // Leaves higher
         dummy.updateMatrix();
         leavesMeshInstanced.setMatrixAt(treeIdx, dummy.matrix);
+        const leafColor = leafPalette[Math.floor(Math.random() * leafPalette.length)] || leafPalette[0];
+        leavesMeshInstanced.setColorAt(treeIdx, new THREE.Color(leafColor));
         treeIdx++;
     }
     trunkMeshInstanced.instanceMatrix.needsUpdate = true;
     leavesMeshInstanced.instanceMatrix.needsUpdate = true;
+    if (leavesMeshInstanced.instanceColor) leavesMeshInstanced.instanceColor.needsUpdate = true;
 }
 
 function checkCollisionWithBuildings(x, z, radius) {
@@ -1341,16 +1493,17 @@ function createVehicle(x, y, z, color, isTraffic = false) { // Added isTraffic p
 function initTraffic() {
     const carColors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, CONFIG.colors.neonBlue];
     const roadCoords = [];
-    for(let c = -380; c <= 380; c += 40) roadCoords.push(c);
+    const halfExtent = (CONFIG.worldSize / 2) - CONFIG.gridSize;
+    for(let c = -halfExtent; c <= halfExtent; c += CONFIG.gridSize) roadCoords.push(c);
 
     for (let i = 0; i < 30; i++) {
         let isXRoad = Math.random() > 0.5;
         let roadIndex = Math.floor(Math.random() * roadCoords.length);
-        let laneCoord = roadCoords[roadIndex]; 
-        let travelCoord = (Math.random() * 800) - 400; 
+        let laneCoord = roadCoords[roadIndex];
+        let travelCoord = (Math.random() * CONFIG.worldSize) - (CONFIG.worldSize / 2);
 
         let direction = Math.random() > 0.5 ? 1 : -1;
-        laneCoord += (direction * 3.5); 
+        laneCoord += (direction * Math.max(3.5, CONFIG.gridSize * 0.1));
 
         let x, z;
         if(isXRoad) {
