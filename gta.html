@@ -588,6 +588,16 @@ function getCityConfig(cityKey) {
     };
 }
 
+function colorToCss(color, alpha = 1) {
+    const hex = color.toString(16).padStart(6, '0');
+    if (alpha >= 1) return `#${hex}`;
+
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 const defaultCity = getCityConfig(DEFAULT_CITY_KEY);
 
 const CONFIG = {
@@ -648,6 +658,7 @@ function applyCityConfig(cityKey) {
     CONFIG.vegetation = { ...city.vegetation };
     CONFIG.missions = city.missions;
     Object.assign(CONFIG.colors, city.colors);
+    resetMissionState();
     document.title = `Grand Theft Auto VI: ${city.name} Vibes`;
     const loadingTitle = document.querySelector('#loading h1');
     if (loadingTitle) {
@@ -715,6 +726,21 @@ function startGame(cityKey = selectedCityKey) {
 // Mission Data
 let missions = [];
 let missionMarkersGroup;
+
+function resetMissionState() {
+    gameState.activeMission = null;
+    missions = [];
+    if (missionMarkersGroup && scene) {
+        scene.remove(missionMarkersGroup);
+    }
+    missionMarkersGroup = null;
+}
+
+function getCityMissions(cityKey = gameState.selectedCity) {
+    const key = CITY_CONFIGS[cityKey] ? cityKey : DEFAULT_CITY_KEY;
+    const city = getCityConfig(key);
+    return city.missions || [];
+}
 
 function setupCitySelection() {
     renderCityGrid();
@@ -950,15 +976,19 @@ function initMissions() {
     if (missionMarkersGroup) {
         scene.remove(missionMarkersGroup);
     }
+    gameState.activeMission = null;
     missions = [];
     missionMarkersGroup = new THREE.Group();
     scene.add(missionMarkersGroup);
 
-    const missionConfigs = (CONFIG.missions || []).map(cfg => ({
+    const missionConfigs = getCityMissions().map(cfg => ({
         color: cfg.color,
         start: { ...cfg.start },
         end: { ...cfg.end }
     }));
+
+    const cityColors = activeCityConfig.colors || {};
+    const destinationColor = cityColors.neonBlue ?? 0xffff00;
 
     missionConfigs.forEach((cfg, index) => {
         // Validate Start Position
@@ -971,23 +1001,24 @@ function initMissions() {
         }
 
         const markerGeo = new THREE.CylinderGeometry(2, 2, 0.2, 32);
-        const markerMat = new THREE.MeshBasicMaterial({ color: cfg.color, transparent: true, opacity: 0.6 });
+        const startColor = cfg.color ?? cityColors.neonPink ?? 0xff0055;
+        const markerMat = new THREE.MeshBasicMaterial({ color: startColor, transparent: true, opacity: 0.6 });
         const marker = new THREE.Mesh(markerGeo, markerMat);
         marker.position.set(cfg.start.x, 0.2, cfg.start.z);
         missionMarkersGroup.add(marker);
 
-        const destGeo = new THREE.CylinderGeometry(3, 3, 200, 32); 
-        const destMat = new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+        const destGeo = new THREE.CylinderGeometry(3, 3, 200, 32);
+        const destMat = new THREE.MeshBasicMaterial({ color: destinationColor, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
         const destMarker = new THREE.Mesh(destGeo, destMat);
-        destMarker.position.set(cfg.end.x, 100, cfg.end.z); 
+        destMarker.position.set(cfg.end.x, 100, cfg.end.z);
         destMarker.visible = false;
         missionMarkersGroup.add(destMarker);
-        
+
         const ringGeo = new THREE.RingGeometry(3, 4, 32);
-        const ringMat = new THREE.MeshBasicMaterial({ color: 0xffff00, side: THREE.DoubleSide });
+        const ringMat = new THREE.MeshBasicMaterial({ color: destinationColor, side: THREE.DoubleSide });
         const ring = new THREE.Mesh(ringGeo, ringMat);
         ring.rotation.x = -Math.PI/2;
-        ring.position.y = -100 + 0.5; 
+        ring.position.y = -100 + 0.5;
         destMarker.add(ring);
 
         missions.push({
@@ -998,7 +1029,7 @@ function initMissions() {
             endPos: new THREE.Vector3(cfg.end.x, 0, cfg.end.z),
             startMesh: marker,
             endMesh: destMarker,
-            color: cfg.color
+            color: startColor
         });
     });
 }
@@ -1853,7 +1884,14 @@ function initMinimap() {
 function updateMinimap() {
     if (!minimapCtx) return;
     const ctx = minimapCtx;
-    ctx.fillStyle = '#111';
+    const cityColors = activeCityConfig.colors || {};
+    const groundColor = colorToCss(cityColors.ground ?? 0x111111);
+    const buildingColor = colorToCss(cityColors.neonBlue ?? 0x555555, 0.55);
+    const routeColor = colorToCss(cityColors.neonPink ?? 0xffff00);
+    const destinationColor = colorToCss(cityColors.neonBlue ?? 0xffff00);
+    const playerColor = colorToCss(cityColors.neonPink ?? 0xffffff);
+
+    ctx.fillStyle = groundColor;
     ctx.fillRect(0, 0, 200, 200);
 
     const cx = 100;
@@ -1862,11 +1900,11 @@ function updateMinimap() {
 
     const pPos = gameState.isDriving ? activeVehicle.mesh.position : player.mesh.position;
     
-    ctx.fillStyle = '#555';
+    ctx.fillStyle = buildingColor;
     cityBuildings.forEach(b => {
         let rx = b.x - pPos.x;
         let rz = b.z - pPos.z;
-        let angle = cameraAngles.yaw + Math.PI; 
+        let angle = cameraAngles.yaw + Math.PI;
         let nx = rx * Math.cos(angle) - rz * Math.sin(angle);
         let nz = rx * Math.sin(angle) + rz * Math.cos(angle);
         let screenX = cx + nx * scale / 5;
@@ -1881,7 +1919,7 @@ function updateMinimap() {
             let angle = cameraAngles.yaw + Math.PI;
             let nx = rx * Math.cos(angle) - rz * Math.sin(angle);
             let nz = rx * Math.sin(angle) + rz * Math.cos(angle);
-            ctx.fillStyle = '#' + m.color.toString(16).padStart(6, '0');
+            ctx.fillStyle = colorToCss(m.color ?? cityColors.neonPink ?? 0xff00ff);
             ctx.beginPath(); ctx.arc(cx + nx * scale/5, cy + nz * scale/5, 4, 0, Math.PI*2); ctx.fill();
         }
     });
@@ -1893,14 +1931,14 @@ function updateMinimap() {
         let angle = cameraAngles.yaw + Math.PI;
         let nx = rx * Math.cos(angle) - rz * Math.sin(angle);
         let nz = rx * Math.sin(angle) + rz * Math.cos(angle);
-        ctx.strokeStyle = '#ffff00'; ctx.lineWidth = 3;
+        ctx.strokeStyle = routeColor; ctx.lineWidth = 3;
         ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + nx * scale/5, cy + nz * scale/5); ctx.stroke();
-        ctx.fillStyle = '#ffff00'; ctx.beginPath(); ctx.arc(cx + nx * scale/5, cy + nz * scale/5, 5, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = destinationColor; ctx.beginPath(); ctx.arc(cx + nx * scale/5, cy + nz * scale/5, 5, 0, Math.PI*2); ctx.fill();
     }
 
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = playerColor;
     ctx.beginPath();
     ctx.moveTo(0, -6); ctx.lineTo(4, 4); ctx.lineTo(0, 2); ctx.lineTo(-4, 4);
     ctx.fill();
