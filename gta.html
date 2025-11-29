@@ -252,9 +252,136 @@
             #wasted-text { font-size: 60px; }
             #mission-text { top: 30%; }
         }
+
+        /* City select modal */
+        #city-modal {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at 20% 20%, rgba(255,0,85,0.1), transparent 35%),
+                        radial-gradient(circle at 80% 30%, rgba(0,210,255,0.15), transparent 40%),
+                        rgba(0,0,0,0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1200;
+            color: #fff;
+        }
+
+        .city-modal-content {
+            width: min(1100px, 90vw);
+            background: linear-gradient(135deg, rgba(22,22,22,0.95), rgba(35,35,35,0.95));
+            border: 2px solid rgba(255,255,255,0.08);
+            border-radius: 18px;
+            box-shadow: 0 25px 70px rgba(0,0,0,0.45);
+            padding: 28px 28px 20px;
+            backdrop-filter: blur(6px);
+        }
+
+        .city-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+
+        .city-modal-header h2 {
+            margin: 0;
+            font-size: 26px;
+            letter-spacing: 2px;
+        }
+
+        #city-start-btn {
+            background: linear-gradient(90deg, #ff0055, #ff6a00);
+            color: #fff;
+            border: none;
+            padding: 12px 18px;
+            border-radius: 10px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(255,0,85,0.35);
+        }
+
+        #city-start-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 36px rgba(255,0,85,0.45);
+        }
+
+        .city-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+        }
+
+        .city-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 14px;
+            cursor: pointer;
+            transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+        }
+
+        .city-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+        }
+
+        .city-card.selected {
+            border-color: #ff0055;
+            box-shadow: 0 12px 26px rgba(255,0,85,0.25);
+        }
+
+        .city-card h3 {
+            margin: 0 0 4px 0;
+            letter-spacing: 1px;
+        }
+
+        .city-tag {
+            font-size: 12px;
+            opacity: 0.75;
+        }
+
+        .city-desc {
+            font-size: 13px;
+            line-height: 1.5;
+            margin: 8px 0 12px 0;
+            color: rgba(255,255,255,0.82);
+        }
+
+        .city-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .city-actions button {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 8px 10px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .city-actions button:hover {
+            background: rgba(255,255,255,0.16);
+            border-color: rgba(255,255,255,0.3);
+        }
     </style>
 </head>
 <body>
+
+<div id="city-modal">
+    <div class="city-modal-content">
+        <div class="city-modal-header">
+            <h2>Select Your City</h2>
+            <button id="city-start-btn">Start in Los Angeles</button>
+        </div>
+        <div class="city-grid" id="city-grid"></div>
+    </div>
+</div>
 
 <!-- UI Layers -->
 <div id="loading">
@@ -315,21 +442,30 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
 // --- CONFIGURATION & CONSTANTS ---
+const CITY_CONFIGS = {
+    la: { name: 'Los Angeles', preview: 'Neon sunsets & wide freeways', description: 'Cruise neon-drenched boulevards, palm-lined freeways, and hazy sunsets straight out of an action flick.', colors: { skyTop: 0x4477bb, skyBottom: 0xffaa66, ground: 0x222222, neonPink: 0xff0055, neonBlue: 0x00d2ff } },
+    nyc: { name: 'New York City', preview: 'Skyscrapers & steam vents', description: 'Tight grids, towering glass, and an endless buzz echoing up from the subway grates.', colors: { skyTop: 0x1c2b3f, skyBottom: 0xffd166, ground: 0x1b1b1b, neonPink: 0xff3366, neonBlue: 0x53a0fd } },
+    miami: { name: 'Miami', preview: 'Art deco glow', description: 'Pastel art deco strips, turquoise waters, and humid midnight rides past neon palms.', colors: { skyTop: 0x2c7da0, skyBottom: 0xff8fa3, ground: 0x1e2a2f, neonPink: 0xff5f9e, neonBlue: 0x53f3ff } },
+    tokyo: { name: 'Tokyo', preview: 'Rain-slicked alleys', description: 'Blade-runner streets with towering billboards, lantern alleys, and reflections on wet asphalt.', colors: { skyTop: 0x0f1b2c, skyBottom: 0x7f5af0, ground: 0x111111, neonPink: 0xff4d6d, neonBlue: 0x5af8ff } },
+    paris: { name: 'Paris', preview: 'Golden hours & stone', description: 'Cobblestone avenues, riverfront drives, and gold-lit monuments cutting through the mist.', colors: { skyTop: 0x3c4f76, skyBottom: 0xf2c57c, ground: 0x2b2620, neonPink: 0xff7f66, neonBlue: 0x9ddafc } },
+    london: { name: 'London', preview: 'Fog & fast lanes', description: 'Moody skies, Thames-side loops, and the glow of theater rows off the rain.', colors: { skyTop: 0x2a3140, skyBottom: 0xc4d6e5, ground: 0x1f2224, neonPink: 0xff4f81, neonBlue: 0x8cc7ff } },
+    rio: { name: 'Rio de Janeiro', preview: 'Beachfront chaos', description: 'Beachfront sweeps, jungle-backed hills, and carnival lights pouring into the avenues.', colors: { skyTop: 0x2f6b46, skyBottom: 0xffd166, ground: 0x1f2b24, neonPink: 0xff6b6b, neonBlue: 0x5ef3c7 } },
+    dubai: { name: 'Dubai', preview: 'Chrome & desert', description: 'Glass spires in desert heat, desert motorways, and hyper-polished neon malls.', colors: { skyTop: 0x1f3a4a, skyBottom: 0xffc46b, ground: 0x1d1a17, neonPink: 0xff3c6f, neonBlue: 0x62d5ff } },
+    sydney: { name: 'Sydney', preview: 'Harbor lights', description: 'Harbor bridges, cliffside drives, and crisp ocean air under electric blues.', colors: { skyTop: 0x234a67, skyBottom: 0x99d6ff, ground: 0x1f2d33, neonPink: 0xff4c7f, neonBlue: 0x7cd5ff } },
+    chicago: { name: 'Chicago', preview: 'Windy grid', description: 'Steel bridges, elevated trains, and hard-edged grids pulsing with jazz neon.', colors: { skyTop: 0x1f3a52, skyBottom: 0xffb347, ground: 0x202428, neonPink: 0xff5c5c, neonBlue: 0x6cc0ff } }
+};
+
+const DEFAULT_CITY_KEY = 'la';
+
 const CONFIG = {
-    worldSize: 1200, 
+    worldSize: 1200,
     chunkSize: 50,
     gravity: 30,
     playerSpeed: 10,
     sprintSpeed: 18,
-    carSpeed: 70, 
+    carSpeed: 70,
     carTurnSpeed: 2.5,
-    colors: {
-        skyTop: 0x4477bb, 
-        skyBottom: 0xffaa66, 
-        ground: 0x222222, 
-        neonPink: 0xff0055,
-        neonBlue: 0x00d2ff
-    }
+    colors: { ...CITY_CONFIGS[DEFAULT_CITY_KEY].colors }
 };
 
 // --- GLOBAL VARIABLES ---
@@ -351,16 +487,100 @@ let input = {
     drive: { x: 0, y: 0, magnitude: 0 },
     driveTarget: { x: 0, y: 0, magnitude: 0 }
 };
-let gameState = { wantedLevel: 0, cash: 0, isDriving: false, wasted: false, activeMission: null };
+let gameState = { wantedLevel: 0, cash: 0, isDriving: false, wasted: false, activeMission: null, selectedCity: DEFAULT_CITY_KEY };
 let cameraAngles = { yaw: 0, pitch: 0.2 };
 let touchLookState = { targetYawDelta: 0, targetPitchDelta: 0, velocityYaw: 0, velocityPitch: 0 };
 let minimapCtx;
 let raycaster = new THREE.Raycaster();
 const dummy = new THREE.Object3D(); // For InstancedMesh updates
 
+let selectedCityKey = DEFAULT_CITY_KEY;
+let hasStarted = false;
+
+function applyCityConfig(cityKey) {
+    const resolvedKey = CITY_CONFIGS[cityKey] ? cityKey : DEFAULT_CITY_KEY;
+    const city = CITY_CONFIGS[resolvedKey];
+    selectedCityKey = resolvedKey;
+    gameState.selectedCity = resolvedKey;
+    Object.assign(CONFIG.colors, city.colors);
+    document.title = `Grand Theft Auto VI: ${city.name} Vibes`;
+    const loadingTitle = document.querySelector('#loading h1');
+    if (loadingTitle) {
+        loadingTitle.innerHTML = `${city.name.toUpperCase()} <span style="color:#ff0055">VIBES</span>`;
+    }
+}
+
+function renderCityGrid() {
+    const grid = document.getElementById('city-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    Object.entries(CITY_CONFIGS).forEach(([key, city]) => {
+        const card = document.createElement('div');
+        card.className = 'city-card';
+        card.dataset.cityKey = key;
+        card.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <div>
+                    <h3>${city.name}</h3>
+                    <div class="city-tag">${city.preview}</div>
+                </div>
+                <span style="font-size:18px; opacity:0.85;">🌆</span>
+            </div>
+            <div class="city-desc">${city.description}</div>
+            <div class="city-actions"><button data-city-key="${key}">Start Here</button></div>
+        `;
+        card.addEventListener('click', () => selectCity(key));
+        card.querySelector('button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectCity(key);
+            startGame(key);
+        });
+        grid.appendChild(card);
+    });
+}
+
+function selectCity(cityKey) {
+    selectedCityKey = CITY_CONFIGS[cityKey] ? cityKey : DEFAULT_CITY_KEY;
+    const grid = document.getElementById('city-grid');
+    if (grid) {
+        grid.querySelectorAll('.city-card').forEach(card => {
+            card.classList.toggle('selected', card.dataset.cityKey === selectedCityKey);
+        });
+    }
+    const city = CITY_CONFIGS[selectedCityKey];
+    const startBtn = document.getElementById('city-start-btn');
+    if (startBtn && city) {
+        startBtn.textContent = `Start in ${city.name}`;
+    }
+}
+
+function startGame(cityKey = selectedCityKey) {
+    if (hasStarted) return;
+    const chosenKey = CITY_CONFIGS[cityKey] ? cityKey : DEFAULT_CITY_KEY;
+    applyCityConfig(chosenKey);
+    const modal = document.getElementById('city-modal');
+    if (modal) modal.style.display = 'none';
+    const loader = document.getElementById('loading');
+    if (loader) loader.style.display = 'flex';
+    hasStarted = true;
+    init();
+}
+
 // Mission Data
 let missions = [];
 let missionMarkersGroup;
+
+function setupCitySelection() {
+    renderCityGrid();
+    selectCity(DEFAULT_CITY_KEY);
+    const startBtn = document.getElementById('city-start-btn');
+    if (startBtn) startBtn.addEventListener('click', () => startGame(selectedCityKey));
+    const loader = document.getElementById('loading');
+    if (loader) loader.style.display = 'none';
+    const modal = document.getElementById('city-modal');
+    if (modal) modal.style.display = 'flex';
+}
 
 // --- INPUT MANAGER ---
 function initInput() {
@@ -1572,7 +1792,7 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-init();
+setupCitySelection();
 
 </script>
 </body>
