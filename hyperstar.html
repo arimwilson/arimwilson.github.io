@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Hyperstar Screensaver</title>
+    <style>
+      :root {
+        --panel-bg: rgba(0, 0, 0, 0.55);
+        --panel-border: rgba(255, 255, 255, 0.12);
+        --text: rgba(255, 255, 255, 0.92);
+        --muted: rgba(255, 255, 255, 0.65);
+      }
+
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: #000;
+        overflow: hidden;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
+          Arial, sans-serif;
+        color: var(--text);
+      }
+
+      /* Fullscreen canvas */
+      canvas#hyperstar {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        display: block;
+        background: #000;
+      }
+
+      /* Controls overlay */
+      .hud {
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        width: min(360px, calc(100vw - 32px));
+        padding: 14px 14px 12px;
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 14px;
+        backdrop-filter: blur(6px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        user-select: none;
+      }
+
+      .hud h1 {
+        font-size: 14px;
+        margin: 0 0 10px;
+        letter-spacing: 0.2px;
+        font-weight: 650;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+        margin: 10px 0;
+      }
+
+      .row label {
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .row output {
+        font-size: 12px;
+        color: var(--text);
+        min-width: 48px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
+      input[type="range"] {
+        width: 100%;
+        accent-color: white;
+      }
+
+      .buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      button {
+        appearance: none;
+        border: 1px solid var(--panel-border);
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+        padding: 8px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: transform 80ms ease, background 120ms ease;
+      }
+
+      button:active {
+        transform: translateY(1px);
+      }
+
+      button:hover {
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      .hint {
+        margin-top: 10px;
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.35;
+      }
+
+      .hint kbd {
+        border: 1px solid var(--panel-border);
+        background: rgba(255, 255, 255, 0.08);
+        padding: 2px 6px;
+        border-radius: 8px;
+        font-size: 11px;
+        color: var(--text);
+      }
+    </style>
+  </head>
+
+  <body>
+    <canvas id="hyperstar"></canvas>
+
+    <div class="hud" id="hud" role="region" aria-label="Hyperstar controls">
+      <h1>Hyperstar Screensaver</h1>
+
+      <div class="row">
+        <label for="density">Density</label>
+        <output id="densityValue">—</output>
+      </div>
+      <input
+        id="density"
+        type="range"
+        min="100"
+        max="3000"
+        value="1200"
+        step="50"
+      />
+
+      <div class="row">
+        <label for="speed">Speed</label>
+        <output id="speedValue">—</output>
+      </div>
+      <input id="speed" type="range" min="0" max="40" value="12" step="1" />
+
+      <div class="row">
+        <label for="spread">Spread</label>
+        <output id="spreadValue">—</output>
+      </div>
+      <input
+        id="spread"
+        type="range"
+        min="50"
+        max="800"
+        value="320"
+        step="10"
+      />
+
+      <div class="buttons">
+        <button id="colorfulBtn" type="button">Colorful</button>
+        <button id="pauseBtn" type="button">Pause</button>
+        <button id="resetBtn" type="button">Reset</button>
+      </div>
+
+      <div class="hint">
+        Keys: <kbd>Space</kbd> pause, <kbd>H</kbd> hide UI.
+      </div>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("hyperstar");
+      const ctx = canvas.getContext("2d");
+
+      const hud = document.getElementById("hud");
+
+      const density = document.getElementById("density");
+      const speed = document.getElementById("speed");
+      const spread = document.getElementById("spread");
+
+      const densityValue = document.getElementById("densityValue");
+      const speedValue = document.getElementById("speedValue");
+      const spreadValue = document.getElementById("spreadValue");
+
+      const colorfulBtn = document.getElementById("colorfulBtn");
+      const pauseBtn = document.getElementById("pauseBtn");
+      const resetBtn = document.getElementById("resetBtn");
+
+      const settings = {
+        density: parseInt(density.value, 10), // number of stars
+        speed: parseFloat(speed.value), // how much z decreases per frame
+        spread: parseFloat(spread.value), // how wide the starfield is
+        colorful: true,
+        paused: false,
+      };
+      const maxZ = 1000; // maximum z distance
+      const nearZ = 1; // z distance at which star is reset
+      let lastTime = 0;
+      let vw = window.innerWidth;
+      let vh = window.innerHeight;
+      let stars = [];
+      let pointerX = vw / 2;
+      let pointerY = vh / 2;
+
+      function rand(min, max) {
+        return Math.floor(min + Math.random() * (max - min));
+      }
+
+      function resizeCanvas() {
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        vw = window.innerWidth;
+        vh = window.innerHeight;
+        canvas.width = Math.floor(vw * devicePixelRatio);
+        canvas.height = Math.floor(vh * devicePixelRatio);
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+      }
+
+      function syncUI() {
+        const oldDensity = settings.density;
+        settings.density = Number(density.value);
+        if (settings.density > oldDensity) {
+          initStars(settings.density - oldDensity);
+        } else if (settings.density < oldDensity) {
+          stars.length = settings.density;
+        }
+        settings.speed = Number(speed.value);
+        settings.spread = Number(spread.value);
+
+        densityValue.textContent = settings.density.toLocaleString();
+        speedValue.textContent = settings.speed.toFixed(0);
+        spreadValue.textContent = settings.spread.toFixed(0);
+      }
+
+      function pause() {
+        if (pauseBtn.textContent === "Pause") {
+          pauseBtn.textContent = "Resume";
+        } else {
+          pauseBtn.textContent = "Pause";
+        }
+        settings.paused = !settings.paused;
+      }
+
+      function bindUI() {
+        const onUI = () => {
+          syncUI();
+        };
+        density.addEventListener("input", onUI);
+        speed.addEventListener("input", onUI);
+        spread.addEventListener("input", onUI);
+
+        colorfulBtn.addEventListener("click", () => {
+          if (colorfulBtn.textContent === "Colorful") {
+            colorfulBtn.textContent = "Monochrome";
+          } else {
+            colorfulBtn.textContent = "Colorful";
+          }
+          settings.colorful = !settings.colorful;
+        });
+        pauseBtn.addEventListener("click", pause);
+        resetBtn.addEventListener("click", () => {
+          stars.length = 0;
+          initStars(settings.density);
+        });
+
+        window.addEventListener("keydown", (e) => {
+          if (e.code === "Space") {
+            e.preventDefault();
+            pause();
+          } else if (e.key.toLowerCase() === "h") {
+            hud.style.display = hud.style.display === "none" ? "block" : "none";
+          }
+        });
+
+        window.addEventListener("pointermove", (e) => {
+          pointerX = e.clientX;
+          pointerY = e.clientY;
+        });
+      }
+
+      function initStars(count) {
+        for (let i = 0; i < count; i++) {
+          stars.push({
+            x: rand(-settings.spread, settings.spread),
+            y: rand(-settings.spread, settings.spread),
+            z: rand(0, maxZ),
+            prevZ: maxZ,
+            r: rand(0, 255),
+            g: rand(0, 255),
+            b: rand(0, 255),
+          });
+        }
+      }
+
+      function resetStar() {
+        return {
+          x: rand(-settings.spread, settings.spread),
+          y: rand(-settings.spread, settings.spread),
+          z: maxZ,
+          prevZ: maxZ,
+          r: rand(0, 255),
+          g: rand(0, 255),
+          b: rand(0, 255),
+        };
+      }
+
+      function clearCanvas() {
+        ctx.fillStyle = "black";
+        ctx.fillRect(0, 0, vw, vh);
+      }
+
+      function updateAndRender(time) {
+        if (!lastTime) lastTime = time;
+        // change in time in seconds
+        const deltaTime = (time - lastTime) / 1000.0;
+        lastTime = time;
+
+        if (!settings.paused) {
+          for (let star of stars) {
+            star.prevZ = star.z;
+            star.z -= settings.speed * deltaTime * 4;
+            if (star.z < nearZ) {
+              Object.assign(star, resetStar());
+            }
+          }
+        }
+
+        clearCanvas();
+        for (let star of stars) {
+          // calculate screen position of stars. do basic projection onto 2d
+          // plane based on z distance using x/z and y/z.
+          let sx = vw / 2 + (star.x / star.z) * (vw / 2);
+          let sy = vh / 2 + (star.y / star.z) * (vh / 2);
+          // shift positions slightly based on pointer position
+          sx = sx + (pointerX - vw / 2) * (star.z / maxZ) * 0.1;
+          sy = sy + (pointerY - vh / 2) * (star.z / maxZ) * 0.1;
+
+          const size = Math.max(0, 2 - (star.z / maxZ) * 2);
+          const brightness = Math.max(0, 1 - star.z / maxZ);
+
+          if (settings.colorful) {
+            ctx.fillStyle = `rgba(${star.r}, ${star.g}, ${star.b}, ${brightness})`;
+          } else {
+            ctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
+          }
+          ctx.beginPath();
+          ctx.arc(sx, sy, size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        requestAnimationFrame(updateAndRender);
+      }
+
+      // Boot
+      resizeCanvas();
+      window.addEventListener("resize", resizeCanvas);
+      syncUI();
+      bindUI();
+      initStars(settings.density);
+      requestAnimationFrame(updateAndRender);
+    </script>
+  </body>
+</html>
