@@ -24,9 +24,6 @@
       }
 
       /* Fullscreen canvas */
-      canvas {
-        touch-action: none;
-      }
       canvas#hyperstar {
         position: fixed;
         inset: 0;
@@ -34,6 +31,7 @@
         height: 100vh;
         display: block;
         background: #000;
+        touch-action: none;
       }
 
       /* Controls overlay */
@@ -171,6 +169,7 @@
 
       <div class="buttons">
         <button id="colorfulBtn" type="button">Colorful</button>
+        <button id="streaksBtn" type="button">No Streaks</button>
         <button id="pauseBtn" type="button">Pause</button>
         <button id="resetBtn" type="button">Reset</button>
       </div>
@@ -195,6 +194,7 @@
       const spreadValue = document.getElementById("spreadValue");
 
       const colorfulBtn = document.getElementById("colorfulBtn");
+      const streaksBtn = document.getElementById("streaksBtn");
       const pauseBtn = document.getElementById("pauseBtn");
       const resetBtn = document.getElementById("resetBtn");
 
@@ -203,10 +203,11 @@
         speed: parseFloat(speed.value), // how much z decreases per frame
         spread: parseFloat(spread.value), // how wide the starfield is
         colorful: true,
+        streaks: false,
         paused: false,
       };
       const maxZ = 1000; // maximum z distance
-      const nearZ = 1; // z distance at which star is reset
+      const nearZ = 20; // z distance at which star is reset
       let lastTime = 0;
       let vw = window.innerWidth;
       let vh = window.innerHeight;
@@ -268,6 +269,15 @@
           }
           settings.colorful = !settings.colorful;
         });
+
+        streaksBtn.addEventListener("click", () => {
+          if (streaksBtn.textContent === "Streaks") {
+            streaksBtn.textContent = "No Streaks";
+          } else {
+            streaksBtn.textContent = "Streaks";
+          }
+          settings.streaks = !settings.streaks;
+        });
         pauseBtn.addEventListener("click", pause);
         resetBtn.addEventListener("click", () => {
           stars.length = 0;
@@ -295,7 +305,8 @@
             x: rand(-settings.spread, settings.spread),
             y: rand(-settings.spread, settings.spread),
             z: rand(0, maxZ),
-            prevZ: maxZ,
+            prevSx: NaN,
+            prevSy: NaN,
             r: rand(0, 255),
             g: rand(0, 255),
             b: rand(0, 255),
@@ -308,7 +319,8 @@
           x: rand(-settings.spread, settings.spread),
           y: rand(-settings.spread, settings.spread),
           z: maxZ,
-          prevZ: maxZ,
+          prevSx: NaN,
+          prevSy: NaN,
           r: rand(0, 255),
           g: rand(0, 255),
           b: rand(0, 255),
@@ -328,7 +340,6 @@
 
         if (!settings.paused) {
           for (let star of stars) {
-            star.prevZ = star.z;
             star.z -= settings.speed * deltaTime * 4;
             if (star.z < nearZ) {
               Object.assign(star, resetStar());
@@ -354,9 +365,31 @@
           } else {
             ctx.fillStyle = `rgba(255, 255, 255, ${brightness})`;
           }
-          ctx.beginPath();
-          ctx.arc(sx, sy, size, 0, Math.PI * 2);
-          ctx.fill();
+          if (!settings.streaks) {
+            ctx.beginPath();
+            ctx.arc(sx, sy, size, 0, Math.PI * 2);
+            ctx.fill();
+            star.prevSx = sx;
+            star.prevSy = sy;
+          } else if (!Number.isNaN(star.prevSx) && !Number.isNaN(star.prevSy)) {
+            const trailDuration = 0.1;
+            const dt = Math.max(deltaTime, 0.001);
+            const scale = trailDuration / dt;
+            const dx = sx - star.prevSx;
+            const dy = sy - star.prevSy;
+
+            // Draw the line
+            ctx.strokeStyle = ctx.fillStyle;
+            ctx.lineWidth = size;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            // Backtrace from current position by the scaled vector
+            ctx.moveTo(sx - dx * scale, sy - dy * scale);
+            ctx.lineTo(sx, sy);
+            ctx.stroke();
+          }
+          star.prevSx = sx;
+          star.prevSy = sy;
         }
 
         requestAnimationFrame(updateAndRender);
