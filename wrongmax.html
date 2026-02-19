@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Wrong Max?</title>
+    <style>
+      :root {
+        --bg: #0f0f13;
+        --card-bg: #1a1a22;
+        --card-border: rgba(255, 255, 255, 0.08);
+        --accent: #7b8cde;
+        --text: rgba(255, 255, 255, 0.90);
+        --muted: rgba(255, 255, 255, 0.50);
+        --tag-bg: rgba(123, 140, 222, 0.15);
+      }
+
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        line-height: 1.6;
+      }
+
+      .page {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 64px 24px 80px;
+      }
+
+      .eyebrow {
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 0 0 12px;
+      }
+
+      h1 {
+        font-size: 2.25rem;
+        font-weight: 700;
+        margin: 0 0 8px;
+        letter-spacing: -0.02em;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        margin: 0 0 48px;
+        font-size: 1rem;
+      }
+
+      .cards {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 24px;
+        transition: border-color 0.15s;
+      }
+
+      .card:hover {
+        border-color: rgba(123, 140, 222, 0.35);
+      }
+
+      .card-header {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 6px;
+      }
+
+      .card-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin: 0;
+      }
+
+      .card-role {
+        font-size: 0.8rem;
+        color: var(--accent);
+        font-weight: 500;
+        white-space: nowrap;
+      }
+
+      .card-desc {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin: 0 0 14px;
+      }
+
+      .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tag {
+        background: var(--tag-bg);
+        color: var(--accent);
+        border-radius: 6px;
+        padding: 3px 10px;
+        font-size: 0.78rem;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+      }
+
+      .footer {
+        margin-top: 56px;
+        font-size: 0.8rem;
+        color: var(--muted);
+        border-top: 1px solid var(--card-border);
+        padding-top: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <p class="eyebrow">Disambiguation</p>
+      <h1>Wrong Max?</h1>
+      <p class="subtitle">
+        You've reached a Max at Celonis — but which one? Pick the right one below.
+      </p>
+
+      <div class="cards">
+
+        <div class="card">
+          <div class="card-header">
+            <p class="card-name">Max Ratzke</p>
+            <span class="card-role">TL, BGT Team</span>
+          </div>
+          <p class="card-desc">
+            Tech lead for the BGT team. The Max to talk to about how objects and
+            events are structured and modeled.
+          </p>
+          <div class="tags">
+            <span class="tag">Objects &amp; Events</span>
+            <span class="tag">Data Modeling</span>
+            <span class="tag">BGT</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <p class="card-name">Max Springer</p>
+            <span class="card-role">Engineering Manager, Compute</span>
+          </div>
+          <p class="card-desc">
+            Manager responsible for the compute domain. Go here for thoughtful
+            takes on management philosophy and how to run effective meetings.
+          </p>
+          <div class="tags">
+            <span class="tag">Compute</span>
+            <span class="tag">Management</span>
+            <span class="tag">Meetings</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <p class="card-name">Max Reithmann</p>
+            <span class="card-role">Head of IT</span>
+          </div>
+          <p class="card-desc">
+            Head of IT for Celonis. The Max responsible for new IT policies —
+            ideal if you have strong opinions about said policies and feel the
+            need to share them, loudly.
+          </p>
+          <div class="tags">
+            <span class="tag">IT</span>
+            <span class="tag">Policies</span>
+            <span class="tag">Trolling</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="footer">
+        astri.me/wrongmax &mdash; still not the right Max? Try again.
+      </div>
+    </div>
+  </body>
+</html>
