@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>House Color Visualizer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-mode="view">
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1>House Color Visualizer</h1>
+      <span class="hint" id="mode-hint">Pick colors for siding, trim, and stucco &rarr;</span>
+    </div>
+    <div class="topbar-right">
+      <button id="btn-before-after" class="btn" title="Hold or toggle to see the original photo">
+        Show original
+      </button>
+      <button id="btn-save-combo" class="btn">Save combo&hellip;</button>
+      <button id="btn-edit-masks" class="btn btn-secondary">Edit masks</button>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <!-- ====== Photo pane ====== -->
+    <section class="photo-pane">
+      <div class="svg-wrap" id="svg-wrap">
+        <svg id="stage" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <!-- Clip paths per surface. Built dynamically by app.js from masks JSON. -->
+            <clipPath id="clip-siding" clipPathUnits="userSpaceOnUse"></clipPath>
+            <clipPath id="clip-trim"   clipPathUnits="userSpaceOnUse"></clipPath>
+            <clipPath id="clip-stucco" clipPathUnits="userSpaceOnUse"></clipPath>
+
+            <!--
+              Luminance-preserving tint filter per surface.
+              Step 1 (grayscale) is static.
+              Step 2's first three rows are updated by app.js to
+              encode the target color: [tR 0 0 0 0 / 0 tG 0 0 0 / 0 0 tB 0 0].
+              feComponentTransfer in between lets us brighten dark regions
+              (per-surface exposure slider, defaults to 1.0 = no change).
+            -->
+            <filter id="tint-siding" color-interpolation-filters="sRGB"
+                    x="0" y="0" width="100%" height="100%">
+              <feColorMatrix type="matrix" values="
+                0.2126 0.7152 0.0722 0 0
+                0.2126 0.7152 0.0722 0 0
+                0.2126 0.7152 0.0722 0 0
+                0      0      0      1 0" result="gray"/>
+              <feComponentTransfer in="gray" result="adj">
+                <feFuncR type="linear" slope="1" intercept="0"/>
+                <feFuncG type="linear" slope="1" intercept="0"/>
+                <feFuncB type="linear" slope="1" intercept="0"/>
+              </feComponentTransfer>
+              <feColorMatrix in="adj" type="matrix" values="
+                1 0 0 0 0
+                0 1 0 0 0
+                0 0 1 0 0
+                0 0 0 1 0"/>
+            </filter>
+            <filter id="tint-trim" color-interpolation-filters="sRGB"
+                    x="0" y="0" width="100%" height="100%">
+              <feColorMatrix type="matrix" values="
+                0.2126 0.7152 0.0722 0 0
+                0.2126 0.7152 0.0722 0 0
+                0.2126 0.7152 0.0722 0 0
+                0      0      0      1 0" result="gray"/>
+              <feComponentTransfer in="gray" result="adj">
+                <feFuncR type="linear" slope="1" intercept="0"/>
+                <feFuncG type="linear" slope="1" intercept="0"/>
+                <feFuncB type="linear" slope="1" intercept="0"/>
+              </feComponentTransfer>
+              <feColorMatrix in="adj" type="matrix" values="
+                1 0 0 0 0
+                0 1 0 0 0
+                0 0 1 0 0
+                0 0 0 1 0"/>
+            </filter>
+            <filter id="tint-stucco" color-interpolation-filters="sRGB"
+                    x="0" y="0" width="100%" height="100%">
+              <feColorMatrix type="matrix" values="
+                0.2126 0.7152 0.0722 0 0
+                0.2126 0.7152 0.0722 0 0
+                0.2126 0.7152 0.0722 0 0
+                0      0      0      1 0" result="gray"/>
+              <feComponentTransfer in="gray" result="adj">
+                <feFuncR type="linear" slope="1" intercept="0"/>
+                <feFuncG type="linear" slope="1" intercept="0"/>
+                <feFuncB type="linear" slope="1" intercept="0"/>
+              </feComponentTransfer>
+              <feColorMatrix in="adj" type="matrix" values="
+                1 0 0 0 0
+                0 1 0 0 0
+                0 0 1 0 0
+                0 0 0 1 0"/>
+            </filter>
+          </defs>
+
+          <!-- Base photo -->
+          <image id="base-image" href="house.jpg" x="0" y="0"/>
+
+          <!-- Recolored surfaces: same image, clipped + tinted -->
+          <g id="layer-siding" class="recolor-layer">
+            <image href="house.jpg" x="0" y="0"
+                   clip-path="url(#clip-siding)"
+                   filter="url(#tint-siding)"/>
+          </g>
+          <g id="layer-trim" class="recolor-layer">
+            <image href="house.jpg" x="0" y="0"
+                   clip-path="url(#clip-trim)"
+                   filter="url(#tint-trim)"/>
+          </g>
+          <g id="layer-stucco" class="recolor-layer">
+            <image href="house.jpg" x="0" y="0"
+                   clip-path="url(#clip-stucco)"
+                   filter="url(#tint-stucco)"/>
+          </g>
+
+          <!-- Editor-only layer: polygon previews + vertex handles -->
+          <g id="editor-layer" class="editor-only"></g>
+        </svg>
+      </div>
+
+      <div class="photo-note" id="photo-note" hidden>
+        <strong>No photo found.</strong> Save your house picture as
+        <code>house.jpg</code> inside this folder, then refresh.
+      </div>
+    </section>
+
+    <!-- ====== Controls pane ====== -->
+    <aside class="controls-pane">
+
+      <!-- VIEW MODE controls -->
+      <div class="view-only">
+        <!-- Surface tabs -->
+        <nav class="surface-tabs" id="surface-tabs">
+          <button class="surface-tab is-active" data-surface="siding">
+            <span class="surface-swatch" id="swatch-siding"></span>
+            <span class="surface-label">Siding</span>
+          </button>
+          <button class="surface-tab" data-surface="trim">
+            <span class="surface-swatch" id="swatch-trim"></span>
+            <span class="surface-label">Trim</span>
+          </button>
+          <button class="surface-tab" data-surface="stucco">
+            <span class="surface-swatch" id="swatch-stucco"></span>
+            <span class="surface-label">Stucco</span>
+          </button>
+        </nav>
+
+        <!-- Current selection readout + exposure slider -->
+        <div class="selection-readout" id="selection-readout">
+          <div class="selection-color">
+            <span class="big-swatch" id="big-swatch"></span>
+            <div class="selection-text">
+              <div class="selection-name" id="sel-name">&mdash;</div>
+              <div class="selection-code" id="sel-code">&nbsp;</div>
+            </div>
+          </div>
+          <label class="exposure">
+            <span>Brightness</span>
+            <input type="range" id="exposure" min="0.6" max="1.8" step="0.05" value="1"/>
+            <span class="exposure-val" id="exposure-val">1.00</span>
+          </label>
+        </div>
+
+        <!-- Search -->
+        <input type="search" id="color-search" placeholder="Search SW colors (name or code)" />
+
+        <!-- Swatch grid, populated by app.js -->
+        <div class="palette" id="palette"></div>
+
+        <!-- Saved combos -->
+        <div class="combos">
+          <div class="combos-header">
+            <h3>Saved combos</h3>
+            <span class="hint" id="combos-hint">None yet &mdash; use &ldquo;Save combo&rdquo;</span>
+          </div>
+          <div class="combos-list" id="combos-list"></div>
+        </div>
+
+        <p class="disclaimer">
+          Hex values are approximations of Sherwin-Williams colors. Order real
+          paint chips before committing.
+        </p>
+      </div>
+
+      <!-- EDIT MODE controls -->
+      <div class="edit-only">
+        <h3>Mask editor</h3>
+        <p class="hint">
+          Click on the photo to add polygon points. Press
+          <kbd>Enter</kbd> to close a polygon and assign it to the active
+          surface. You can draw multiple polygons per surface (e.g. siding
+          panels separated by the garage).
+        </p>
+
+        <nav class="surface-tabs edit-surface-tabs">
+          <button class="surface-tab is-active" data-edit-surface="siding">Siding</button>
+          <button class="surface-tab" data-edit-surface="trim">Trim</button>
+          <button class="surface-tab" data-edit-surface="stucco">Stucco</button>
+        </nav>
+
+        <ul class="shortcuts">
+          <li><kbd>Click</kbd> add point</li>
+          <li><kbd>Enter</kbd> close polygon &amp; save to active surface</li>
+          <li><kbd>Esc</kbd> cancel current polygon</li>
+          <li><kbd>Backspace</kbd> remove last point</li>
+          <li><kbd>Right-click</kbd> a polygon to delete it</li>
+          <li><kbd>Scroll</kbd> zoom &middot; <kbd>Space</kbd> + drag to pan</li>
+        </ul>
+
+        <div class="edit-counts" id="edit-counts"></div>
+
+        <div class="edit-actions">
+          <button id="btn-clear-surface" class="btn btn-danger">Clear active surface</button>
+          <button id="btn-export-masks"  class="btn">Export masks JSON</button>
+          <button id="btn-import-masks"  class="btn">Import masks JSON</button>
+          <input type="file" id="import-file" accept=".json,application/json" hidden />
+          <button id="btn-done-editing"  class="btn btn-primary">Done editing</button>
+        </div>
+      </div>
+
+    </aside>
+  </main>
+
+  <!-- Data -->
+  <script src="data/sw-colors.js"></script>
+  <script src="data/masks.default.js"></script>
+
+  <!-- App -->
+  <script src="mask-editor.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
