@@ -218,16 +218,58 @@
         el.dataset.name = color.name;
         el.dataset.code = color.code;
         el.setAttribute("aria-label", `${color.name} ${color.code}`);
-        const tip = document.createElement("span");
-        tip.className = "swatch-tooltip";
-        tip.textContent = `${color.name} · ${color.code}`;
-        el.appendChild(tip);
+        el.dataset.tip = `${color.name} · ${color.code}`;
         el.addEventListener("click", () => pickColor(color));
         grid.appendChild(el);
       }
       section.appendChild(grid);
       container.appendChild(section);
     }
+    ensureSwatchTooltip(container);
+  }
+
+  function ensureSwatchTooltip(container) {
+    let tip = document.getElementById("swatch-tooltip");
+    if (!tip) {
+      tip = document.createElement("div");
+      tip.id = "swatch-tooltip";
+      tip.className = "swatch-tooltip";
+      tip.hidden = true;
+      document.body.appendChild(tip);
+    }
+    if (container.dataset.tooltipBound === "1") return;
+    container.dataset.tooltipBound = "1";
+    const show = (swatch) => {
+      tip.textContent = swatch.dataset.tip || "";
+      tip.hidden = false;
+      const r = swatch.getBoundingClientRect();
+      let x = r.left + r.width / 2;
+      let y = r.top - 6;
+      tip.style.left = x + "px";
+      tip.style.top = y + "px";
+      // Clamp horizontally so it stays in the viewport.
+      const tr = tip.getBoundingClientRect();
+      const margin = 4;
+      if (tr.left < margin) {
+        tip.style.left = (x + (margin - tr.left)) + "px";
+      } else if (tr.right > window.innerWidth - margin) {
+        tip.style.left = (x - (tr.right - (window.innerWidth - margin))) + "px";
+      }
+      // Flip below if it would clip the top.
+      if (tr.top < margin) {
+        tip.style.top = (r.bottom + 6 + tr.height) + "px";
+      }
+    };
+    const hide = () => { tip.hidden = true; };
+    container.addEventListener("pointerover", (e) => {
+      const s = e.target.closest(".swatch");
+      if (s && container.contains(s)) show(s);
+    });
+    container.addEventListener("pointerout", (e) => {
+      const s = e.target.closest(".swatch");
+      if (s && (!e.relatedTarget || !s.contains(e.relatedTarget))) hide();
+    });
+    container.addEventListener("scroll", hide, true);
   }
 
   function pickColor(color) {

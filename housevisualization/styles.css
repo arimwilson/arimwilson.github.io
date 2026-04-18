@@ -253,22 +253,18 @@ body.before-active .recolor-layer { display: none; }
   z-index: 1;
 }
 .swatch-tooltip {
-  position: absolute;
-  bottom: calc(100% + 4px);
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed;
   white-space: nowrap;
   background: #1f1d1a;
   color: #fff;
   padding: 3px 6px;
   border-radius: 3px;
   font-size: 11px;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 100ms;
-  z-index: 2;
+  z-index: 1000;
+  transform: translateX(-50%);
 }
-.swatch:hover .swatch-tooltip { opacity: 1; }
+.swatch-tooltip[hidden] { display: none; }
 
 /* ========== Combos ========== */
 .combos { margin-bottom: 12px; }
