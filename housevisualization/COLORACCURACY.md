@@ -1,5 +1,3 @@
-Honest answers to both:
-
 ## Color accuracy under mixed lighting
 
 The recoloring math is: `output_pixel = target_color_rgb × grayscale_of_original`. That's a cheap 2D trick, not a lighting model. Implications:
