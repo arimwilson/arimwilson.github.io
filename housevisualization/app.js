@@ -1,5 +1,6 @@
 // House Color Visualizer — main viewer.
 // Depends on: data/sw-colors.js (window.SW_COLORS, window.SW_GROUPS),
+//             data/sw-colors-full.js (window.SW_COLORS_FULL, full SW dump),
 //             data/masks.default.js (window.DEFAULT_MASKS),
 //             mask-editor.js (window.MaskEditor).
 (function () {
@@ -190,6 +191,20 @@
   }
 
   // ---------- UI: palette ----------
+  function createSwatch(color) {
+    const el = document.createElement("button");
+    el.className = "swatch";
+    el.type = "button";
+    el.style.background = color.hex;
+    el.dataset.hex = color.hex;
+    el.dataset.name = color.name;
+    el.dataset.code = color.code;
+    el.setAttribute("aria-label", `${color.name} ${color.code}`);
+    el.dataset.tip = `${color.name} · ${color.code}`;
+    el.addEventListener("click", () => pickColor(color));
+    return el;
+  }
+
   function buildPalette() {
     const container = $("palette");
     container.textContent = "";
@@ -210,22 +225,13 @@
       const grid = document.createElement("div");
       grid.className = "swatch-grid";
       for (const color of byGroup.get(group)) {
-        const el = document.createElement("button");
-        el.className = "swatch";
-        el.type = "button";
-        el.style.background = color.hex;
-        el.dataset.hex = color.hex;
-        el.dataset.name = color.name;
-        el.dataset.code = color.code;
-        el.setAttribute("aria-label", `${color.name} ${color.code}`);
-        el.dataset.tip = `${color.name} · ${color.code}`;
-        el.addEventListener("click", () => pickColor(color));
-        grid.appendChild(el);
+        grid.appendChild(createSwatch(color));
       }
       section.appendChild(grid);
       container.appendChild(section);
     }
     ensureSwatchTooltip(container);
+    ensureSwatchTooltip($("palette-full"));
   }
 
   function ensureSwatchTooltip(container) {
@@ -291,21 +297,82 @@
     });
   }
 
+  // ---------- UI: search ----------
+  const FULL_CATALOG_LIMIT = 60;
+
+  function normalizeCodeQuery(q) {
+    // "sw 6234" / "SW6234" / "6234" -> "6234" for digit matching.
+    return q.replace(/\s+/g, "").replace(/^sw/i, "").toLowerCase();
+  }
+
+  function curatedCodeSet() {
+    const s = new Set();
+    for (const c of window.SW_COLORS) s.add(c.code.toUpperCase());
+    return s;
+  }
+
+  function renderFullCatalogMatches(q) {
+    const container = $("palette-full");
+    container.textContent = "";
+    if (!q || !Array.isArray(window.SW_COLORS_FULL)) {
+      container.hidden = true;
+      return;
+    }
+
+    const curated = curatedCodeSet();
+    const codeQ = normalizeCodeQuery(q);
+    const nameQ = q.toLowerCase();
+    const matches = [];
+    for (const c of window.SW_COLORS_FULL) {
+      if (curated.has(c.code.toUpperCase())) continue;
+      const codeDigits = c.code.replace(/^SW/i, "").toLowerCase();
+      const nameHit = c.name.toLowerCase().includes(nameQ);
+      const codeHit = codeQ && codeDigits.includes(codeQ);
+      if (nameHit || codeHit) matches.push(c);
+    }
+
+    if (!matches.length) {
+      container.hidden = true;
+      return;
+    }
+
+    const section = document.createElement("div");
+    section.className = "palette-group";
+    const title = document.createElement("div");
+    title.className = "palette-group-title";
+    const total = matches.length;
+    const shown = Math.min(total, FULL_CATALOG_LIMIT);
+    title.textContent = total > FULL_CATALOG_LIMIT
+      ? `All SW colors (showing ${shown} of ${total} — refine search)`
+      : `All SW colors (${total})`;
+    section.appendChild(title);
+
+    const grid = document.createElement("div");
+    grid.className = "swatch-grid";
+    for (let i = 0; i < shown; i++) grid.appendChild(createSwatch(matches[i]));
+    section.appendChild(grid);
+    container.appendChild(section);
+    container.hidden = false;
+    markSelectedSwatch();
+  }
+
   function wireSearch() {
     const input = $("color-search");
     input.addEventListener("input", () => {
-      const q = input.value.trim().toLowerCase();
-      document.querySelectorAll(".palette-group").forEach(section => {
+      const q = input.value.trim();
+      const qLower = q.toLowerCase();
+      document.querySelectorAll("#palette .palette-group").forEach(section => {
         let visible = 0;
         section.querySelectorAll(".swatch").forEach(el => {
           const hit = !q
-            || el.dataset.name.toLowerCase().includes(q)
-            || el.dataset.code.toLowerCase().includes(q);
+            || el.dataset.name.toLowerCase().includes(qLower)
+            || el.dataset.code.toLowerCase().includes(qLower);
           el.style.display = hit ? "" : "none";
           if (hit) visible++;
         });
         section.style.display = visible ? "" : "none";
       });
+      renderFullCatalogMatches(q);
     });
   }
 

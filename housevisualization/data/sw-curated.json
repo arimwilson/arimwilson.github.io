@@ -1,0 +1,358 @@
+{
+  "colors": [
+    {
+      "code": "SW7006",
+      "group": "Warm Whites & Creams"
+    },
+    {
+      "code": "SW7005",
+      "group": "Warm Whites & Creams"
+    },
+    {
+      "code": "SW7008",
+      "group": "Warm Whites & Creams"
+    },
+    {
+      "code": "SW7004",
+      "group": "Warm Whites & Creams"
+    },
+    {
+      "code": "SW7551",
+      "group": "Warm Whites & Creams"
+    },
+    {
+      "code": "SW7012",
+      "group": "Warm Whites & Creams"
+    },
+    {
+      "code": "SW7011",
+      "group": "Warm Whites & Creams"
+    },
+    {
+      "code": "SW7042",
+      "group": "Warm Whites & Creams"
+    },
+    {
+      "code": "SW7010",
+      "group": "Warm Whites & Creams"
+    },
+    {
+      "code": "SW7036",
+      "group": "Beiges & Greiges"
+    },
+    {
+      "code": "SW7037",
+      "group": "Beiges & Greiges"
+    },
+    {
+      "code": "SW7029",
+      "group": "Beiges & Greiges"
+    },
+    {
+      "code": "SW7043",
+      "group": "Beiges & Greiges"
+    },
+    {
+      "code": "SW7031",
+      "group": "Beiges & Greiges"
+    },
+    {
+      "code": "SW6073",
+      "group": "Beiges & Greiges"
+    },
+    {
+      "code": "SW7050",
+      "group": "Beiges & Greiges"
+    },
+    {
+      "code": "SW7032",
+      "group": "Beiges & Greiges"
+    },
+    {
+      "code": "SW7023",
+      "group": "Beiges & Greiges"
+    },
+    {
+      "code": "SW7038",
+      "group": "Beiges & Greiges"
+    },
+    {
+      "code": "SW6039",
+      "group": "Beiges & Greiges"
+    },
+    {
+      "code": "SW9172",
+      "group": "Beiges & Greiges"
+    },
+    {
+      "code": "SW7507",
+      "group": "Beiges & Greiges"
+    },
+    {
+      "code": "SW0077",
+      "group": "Beiges & Greiges"
+    },
+    {
+      "code": "SW6108",
+      "group": "Browns & Tans"
+    },
+    {
+      "code": "SW6109",
+      "group": "Browns & Tans"
+    },
+    {
+      "code": "SW2822",
+      "group": "Browns & Tans"
+    },
+    {
+      "code": "SW7701",
+      "group": "Browns & Tans"
+    },
+    {
+      "code": "SW6054",
+      "group": "Browns & Tans"
+    },
+    {
+      "code": "SW9173",
+      "group": "Browns & Tans"
+    },
+    {
+      "code": "SW6094",
+      "group": "Browns & Tans"
+    },
+    {
+      "code": "SW2821",
+      "group": "Browns & Tans"
+    },
+    {
+      "code": "SW2819",
+      "group": "Browns & Tans"
+    },
+    {
+      "code": "SW7041",
+      "group": "Browns & Tans"
+    },
+    {
+      "code": "SW7595",
+      "group": "Browns & Tans"
+    },
+    {
+      "code": "SW9130",
+      "group": "Greens"
+    },
+    {
+      "code": "SW6206",
+      "group": "Greens"
+    },
+    {
+      "code": "SW6204",
+      "group": "Greens"
+    },
+    {
+      "code": "SW6212",
+      "group": "Greens"
+    },
+    {
+      "code": "SW6164",
+      "group": "Greens"
+    },
+    {
+      "code": "SW6178",
+      "group": "Greens"
+    },
+    {
+      "code": "SW6191",
+      "group": "Greens"
+    },
+    {
+      "code": "SW6186",
+      "group": "Greens"
+    },
+    {
+      "code": "SW9132",
+      "group": "Greens"
+    },
+    {
+      "code": "SW6207",
+      "group": "Greens"
+    },
+    {
+      "code": "SW6187",
+      "group": "Greens"
+    },
+    {
+      "code": "SW6208",
+      "group": "Greens"
+    },
+    {
+      "code": "SW2847",
+      "group": "Greens"
+    },
+    {
+      "code": "SW2816",
+      "group": "Greens"
+    },
+    {
+      "code": "SW6219",
+      "group": "Blues & Slates"
+    },
+    {
+      "code": "SW6505",
+      "group": "Blues & Slates"
+    },
+    {
+      "code": "SW6470",
+      "group": "Blues & Slates"
+    },
+    {
+      "code": "SW6243",
+      "group": "Blues & Slates"
+    },
+    {
+      "code": "SW6222",
+      "group": "Blues & Slates"
+    },
+    {
+      "code": "SW0032",
+      "group": "Blues & Slates"
+    },
+    {
+      "code": "SW6244",
+      "group": "Blues & Slates"
+    },
+    {
+      "code": "SW7602",
+      "group": "Blues & Slates"
+    },
+    {
+      "code": "SW0068",
+      "group": "Blues & Slates"
+    },
+    {
+      "code": "SW7964",
+      "group": "Blues & Slates"
+    },
+    {
+      "code": "SW7015",
+      "group": "Grays"
+    },
+    {
+      "code": "SW7016",
+      "group": "Grays"
+    },
+    {
+      "code": "SW7017",
+      "group": "Grays"
+    },
+    {
+      "code": "SW7046",
+      "group": "Grays"
+    },
+    {
+      "code": "SW7073",
+      "group": "Grays"
+    },
+    {
+      "code": "SW7504",
+      "group": "Grays"
+    },
+    {
+      "code": "SW7653",
+      "group": "Grays"
+    },
+    {
+      "code": "SW7064",
+      "group": "Grays"
+    },
+    {
+      "code": "SW7066",
+      "group": "Grays"
+    },
+    {
+      "code": "SW7018",
+      "group": "Grays"
+    },
+    {
+      "code": "SW7068",
+      "group": "Grays"
+    },
+    {
+      "code": "SW7019",
+      "group": "Grays"
+    },
+    {
+      "code": "SW7074",
+      "group": "Grays"
+    },
+    {
+      "code": "SW7067",
+      "group": "Grays"
+    },
+    {
+      "code": "SW7065",
+      "group": "Grays"
+    },
+    {
+      "code": "SW7674",
+      "group": "Charcoals & Blacks"
+    },
+    {
+      "code": "SW7048",
+      "group": "Charcoals & Blacks"
+    },
+    {
+      "code": "SW7069",
+      "group": "Charcoals & Blacks"
+    },
+    {
+      "code": "SW7020",
+      "group": "Charcoals & Blacks"
+    },
+    {
+      "code": "SW6258",
+      "group": "Charcoals & Blacks"
+    },
+    {
+      "code": "SW6991",
+      "group": "Charcoals & Blacks"
+    },
+    {
+      "code": "SW6990",
+      "group": "Charcoals & Blacks"
+    },
+    {
+      "code": "SW6992",
+      "group": "Charcoals & Blacks"
+    },
+    {
+      "code": "SW6868",
+      "group": "Accent / Door"
+    },
+    {
+      "code": "SW0033",
+      "group": "Accent / Door"
+    },
+    {
+      "code": "SW2802",
+      "group": "Accent / Door"
+    },
+    {
+      "code": "SW7675",
+      "group": "Accent / Door"
+    },
+    {
+      "code": "SW6171",
+      "group": "Accent / Door"
+    }
+  ],
+  "groups": [
+    "Warm Whites & Creams",
+    "Beiges & Greiges",
+    "Browns & Tans",
+    "Grays",
+    "Greens",
+    "Blues & Slates",
+    "Charcoals & Blacks",
+    "Accent / Door"
+  ]
+}
