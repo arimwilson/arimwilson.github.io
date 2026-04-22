@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>House Color Visualizer</title>
+  <link rel="icon" href="favicon.ico" sizes="any" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body data-mode="view">
@@ -167,10 +168,14 @@
         </div>
 
         <!-- Search -->
-        <input type="search" id="color-search" placeholder="Search SW colors (name or code)" />
+        <input type="search" id="color-search" placeholder="Search any SW color (name or code, e.g. 6234)" />
 
         <!-- Swatch grid, populated by app.js -->
         <div class="palette" id="palette"></div>
+
+        <!-- Full-catalog search results, populated by app.js when the query
+             matches SW colors outside the curated palette. -->
+        <div class="palette full-catalog" id="palette-full" hidden></div>
 
         <!-- Saved combos -->
         <div class="combos">
@@ -228,6 +233,7 @@
 
   <!-- Data -->
   <script src="data/sw-colors.js"></script>
+  <script src="data/sw-colors-full.js"></script>
   <script src="data/masks.default.js"></script>
 
   <!-- App -->
