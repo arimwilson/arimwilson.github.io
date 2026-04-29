@@ -11,6 +11,22 @@
   const LS_MASKS = "hv:masks";
   const LS_SEL   = "hv:selections";
   const LS_COMBOS = "hv:combos";
+  const LS_ALBEDOS = "hv:albedos";
+  const LS_ALGORITHM = "hv:algorithm";
+
+  const ALGO_ALBEDO = "albedo";
+  const ALGO_LEGACY = "legacy";
+
+  // Lower bound per channel before dividing src/albedo — guards against
+  // blow-up from a near-black albedo sample.
+  const ALBEDO_FLOOR = 0.04;
+  const SAMPLE_RADIUS = 2; // 5x5 block for eyedropper averaging
+
+  function defaultAlbedos() {
+    const out = {};
+    for (const s of SURFACES) out[s] = { auto: null, manual: null };
+    return out;
+  }
 
   // ---------- State ----------
   const state = {
@@ -22,7 +38,12 @@
     },
     masks: loadJSON(LS_MASKS, window.DEFAULT_MASKS),
     combos: loadJSON(LS_COMBOS, []),
+    albedos: loadJSON(LS_ALBEDOS, defaultAlbedos()),
+    algorithm: loadJSON(LS_ALGORITHM, ALGO_ALBEDO),
     image: { width: 0, height: 0, loaded: false },
+    baseImageData: null,   // ImageData of house.jpg at natural resolution
+    surfaceMasks: {},      // { siding: Uint8Array, trim: …, stucco: … }
+    sampling: null,        // { surface } while eyedropper armed
   };
 
   // Restore selections from localStorage on top of defaults.
@@ -32,11 +53,19 @@
       if (savedSel[s]) Object.assign(state.selections[s], savedSel[s]);
     }
   }
+  // Repair albedo shape if stored from an older build.
+  for (const s of SURFACES) {
+    if (!state.albedos[s]) state.albedos[s] = { auto: null, manual: null };
+  }
+  if (state.algorithm !== ALGO_ALBEDO && state.algorithm !== ALGO_LEGACY) {
+    state.algorithm = ALGO_ALBEDO;
+  }
 
   // ---------- DOM ----------
   const $ = (id) => document.getElementById(id);
   const stage = $("stage");
   const photoNote = $("photo-note");
+  const taintNote = $("taint-note");
 
   // ---------- Helpers ----------
   function loadJSON(key, fallback) {
@@ -55,15 +84,38 @@
     const n = parseInt(h, 16);
     return [((n >> 16) & 0xff) / 255, ((n >> 8) & 0xff) / 255, (n & 0xff) / 255];
   }
+  function rgb01ToHex(rgb) {
+    const c = (v) => {
+      const n = Math.max(0, Math.min(255, Math.round(v * 255)));
+      return n.toString(16).padStart(2, "0");
+    };
+    return "#" + c(rgb[0]) + c(rgb[1]) + c(rgb[2]);
+  }
 
   // ---------- Image loading ----------
   function loadBaseImage() {
     const probe = new Image();
     probe.onload = () => {
       state.image = { width: probe.naturalWidth, height: probe.naturalHeight, loaded: true };
+      // Cache pixel data once so albedo + re-render loops don't re-decode.
+      try {
+        const c = document.createElement("canvas");
+        c.width = probe.naturalWidth;
+        c.height = probe.naturalHeight;
+        const g = c.getContext("2d", { willReadFrequently: true });
+        g.drawImage(probe, 0, 0);
+        state.baseImageData = g.getImageData(0, 0, c.width, c.height);
+      } catch (e) {
+        console.error("Could not read image pixels (canvas tainted?):", e);
+        if (taintNote) taintNote.hidden = false;
+        return;
+      }
       setupStage();
-      applyAllSelections();
       renderMasks();
+      rebuildSurfaceMasks();
+      autoComputeAllAlbedos();
+      renderAlbedoRows();
+      applyAllSelections();
     };
     probe.onerror = () => {
       photoNote.hidden = false;
@@ -74,22 +126,12 @@
   function setupStage() {
     const { width, height } = state.image;
     stage.setAttribute("viewBox", `0 0 ${width} ${height}`);
-    // Set width/height on every <image> inside the SVG so they render correctly.
     const imgs = stage.querySelectorAll("image");
     imgs.forEach(img => {
       img.setAttribute("width", width);
       img.setAttribute("height", height);
-      // Force-refresh href in case it was stale
       const href = img.getAttribute("href");
-      img.setAttribute("href", href);
-    });
-    // Expand filter regions so they cover the full image.
-    stage.querySelectorAll("filter").forEach(f => {
-      f.setAttribute("x", "0");
-      f.setAttribute("y", "0");
-      f.setAttribute("width", width);
-      f.setAttribute("height", height);
-      f.setAttribute("filterUnits", "userSpaceOnUse");
+      if (href) img.setAttribute("href", href);
     });
   }
 
@@ -112,50 +154,211 @@
     saveJSON(LS_MASKS, state.masks);
   }
 
-  // ---------- Tint filter update ----------
-  // The tint filter's third child (index 2) is the second feColorMatrix,
-  // which holds target color rows. Its first child (index 0) is the
-  // grayscale feColorMatrix. Index 1 is the feComponentTransfer used for
-  // brightness/exposure.
-  function updateSurfaceFilter(surface) {
+  // ---------- Surface masks (bitmap) ----------
+  // Rasterize each surface's polygons to a Uint8Array over the base image —
+  // 1 = pixel belongs to this surface, 0 = doesn't. Used both for albedo
+  // auto-compute and the per-surface recolor pass so we only touch the
+  // pixels that matter.
+  function rasterizeSurfaceMask(surface) {
+    if (!state.image.loaded) return null;
+    const { width, height } = state.image;
+    const polys = state.masks[surface] || [];
+    const mask = new Uint8Array(width * height);
+    if (!polys.length) return mask;
+
+    const c = document.createElement("canvas");
+    c.width = width;
+    c.height = height;
+    const g = c.getContext("2d");
+    g.fillStyle = "#fff";
+    for (const pts of polys) {
+      if (!pts || pts.length < 3) continue;
+      g.beginPath();
+      g.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
+      g.closePath();
+      g.fill();
+    }
+    const d = g.getImageData(0, 0, width, height).data;
+    for (let i = 0, j = 0; j < mask.length; i += 4, j++) {
+      if (d[i + 3] > 0) mask[j] = 1;
+    }
+    return mask;
+  }
+
+  function rebuildSurfaceMasks() {
+    for (const s of SURFACES) state.surfaceMasks[s] = rasterizeSurfaceMask(s);
+  }
+
+  // ---------- Albedo auto-compute ----------
+  // Per-channel 95th-percentile via histogram: O(N) over the mask pixels, no
+  // sort. Using a high percentile (rather than the median) anchors albedo near
+  // the brightest diffuse reading on the surface, so `src/albedo` stays in
+  // [0,1] across the whole surface without clamping — the 95th (vs 99th/max)
+  // trims specular highlights and stray bright outliers.
+  const ALBEDO_PERCENTILE = 0.95;
+  function computeAutoAlbedo(surface) {
+    if (!state.baseImageData || !state.surfaceMasks[surface]) return null;
+    const src = state.baseImageData.data;
+    const mask = state.surfaceMasks[surface];
+    const histR = new Uint32Array(256);
+    const histG = new Uint32Array(256);
+    const histB = new Uint32Array(256);
+    let n = 0;
+    for (let j = 0, i = 0; j < mask.length; j++, i += 4) {
+      if (!mask[j]) continue;
+      histR[src[i]]++;
+      histG[src[i + 1]]++;
+      histB[src[i + 2]]++;
+      n++;
+    }
+    if (!n) return null;
+    return [
+      percentileFromHist(histR, n, ALBEDO_PERCENTILE),
+      percentileFromHist(histG, n, ALBEDO_PERCENTILE),
+      percentileFromHist(histB, n, ALBEDO_PERCENTILE),
+    ];
+  }
+  function percentileFromHist(hist, n, p) {
+    const target = n * p;
+    let count = 0;
+    for (let v = 0; v < 256; v++) {
+      count += hist[v];
+      if (count >= target) return v / 255;
+    }
+    return 1;
+  }
+
+  function autoComputeAllAlbedos() {
+    for (const s of SURFACES) {
+      const a = computeAutoAlbedo(s);
+      state.albedos[s].auto = a;
+    }
+    saveJSON(LS_ALBEDOS, state.albedos);
+  }
+
+  function effectiveAlbedo(surface) {
+    const a = state.albedos[surface];
+    return a.manual || a.auto || null;
+  }
+
+  // ---------- Per-surface canvas render ----------
+  // Offscreen canvases, one per surface, reused between renders.
+  const renderCanvases = {};
+  const renderGen = { siding: 0, trim: 0, stucco: 0 };
+  let rafId = null;
+  const pendingRender = new Set();
+
+  function scheduleRender(surface) {
+    if (surface) pendingRender.add(surface);
+    else for (const s of SURFACES) pendingRender.add(s);
+    if (rafId) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = null;
+      const todo = [...pendingRender];
+      pendingRender.clear();
+      for (const s of todo) renderSurface(s);
+    });
+  }
+
+  function renderSurface(surface) {
     const sel = state.selections[surface];
-    const filter = document.getElementById("tint-" + surface);
-    if (!filter) return;
+    const imgEl = $("recolor-" + surface);
+    const layer = $("layer-" + surface);
+    if (!imgEl || !layer) return;
 
-    const children = filter.children;
-    const transfer = children[1];
-    const tintMatrix = children[2];
-
-    if (!sel.hex) {
-      // No color chosen for this surface yet — render identity
-      // (passes grayscale + then passes through). We hide the layer instead.
-      document.getElementById("layer-" + surface).style.display = "none";
+    if (!sel.hex || !state.baseImageData) {
+      layer.style.display = "none";
       return;
     }
-    document.getElementById("layer-" + surface).style.display = "";
+    const mask = state.surfaceMasks[surface];
+    if (!mask || !mask.length) {
+      layer.style.display = "none";
+      return;
+    }
+    const useAlbedo = state.algorithm === ALGO_ALBEDO;
+    const albedo = useAlbedo ? effectiveAlbedo(surface) : null;
+    if (useAlbedo && !albedo) {
+      // Albedo algorithm selected but nothing to divide out yet.
+      layer.style.display = "none";
+      return;
+    }
+    layer.style.display = "";
 
-    const [r, g, b] = hexToRgb01(sel.hex);
-    tintMatrix.setAttribute("values", [
-      r, 0, 0, 0, 0,
-      0, g, 0, 0, 0,
-      0, 0, b, 0, 0,
-      0, 0, 0, 1, 0,
-    ].join(" "));
+    const { width, height } = state.image;
+    const [tR, tG, tB] = hexToRgb01(sel.hex);
+    const exposure = sel.exposure || 1.0;
+    const a0 = useAlbedo ? Math.max(ALBEDO_FLOOR, albedo[0]) : 1;
+    const a1 = useAlbedo ? Math.max(ALBEDO_FLOOR, albedo[1]) : 1;
+    const a2 = useAlbedo ? Math.max(ALBEDO_FLOOR, albedo[2]) : 1;
+    const src = state.baseImageData.data;
 
-    // Brightness: apply a linear slope on the grayscale so that very dark
-    // regions can be lifted when recoloring dark-to-light.
-    const slope = sel.exposure || 1.0;
-    for (const fnName of ["feFuncR", "feFuncG", "feFuncB"]) {
-      const fn = transfer.getElementsByTagName(fnName)[0];
-      if (fn) {
-        fn.setAttribute("slope", slope);
-        fn.setAttribute("intercept", "0");
+    let c = renderCanvases[surface];
+    if (!c) {
+      c = document.createElement("canvas");
+      renderCanvases[surface] = c;
+    }
+    if (c.width !== width || c.height !== height) {
+      c.width = width;
+      c.height = height;
+    }
+    const g = c.getContext("2d");
+    // Start from a transparent canvas so pixels outside the mask stay clear
+    // (the SVG clip-path also clips them, but belt+suspenders keeps output
+    // small and lets us drop the clip-path later if we ever want to).
+    const out = g.createImageData(width, height);
+    const dst = out.data;
+    if (useAlbedo) {
+      for (let j = 0, i = 0; j < mask.length; j++, i += 4) {
+        if (!mask[j]) continue;
+        const ilR = Math.min(1, (src[i]     / 255) / a0);
+        const ilG = Math.min(1, (src[i + 1] / 255) / a1);
+        const ilB = Math.min(1, (src[i + 2] / 255) / a2);
+        let r = ilR * tR * exposure * 255;
+        let gv = ilG * tG * exposure * 255;
+        let b = ilB * tB * exposure * 255;
+        if (r > 255) r = 255;
+        if (gv > 255) gv = 255;
+        if (b > 255) b = 255;
+        dst[i]     = r;
+        dst[i + 1] = gv;
+        dst[i + 2] = b;
+        dst[i + 3] = 255;
+      }
+    } else {
+      // Legacy luma-tint: out = luma(src) * target * exposure.
+      // Rec.709 weights, same as the original SVG feColorMatrix filter.
+      for (let j = 0, i = 0; j < mask.length; j++, i += 4) {
+        if (!mask[j]) continue;
+        const y = (0.2126 * src[i] + 0.7152 * src[i + 1] + 0.0722 * src[i + 2]) / 255;
+        let r = y * tR * exposure * 255;
+        let gv = y * tG * exposure * 255;
+        let b = y * tB * exposure * 255;
+        if (r > 255) r = 255;
+        if (gv > 255) gv = 255;
+        if (b > 255) b = 255;
+        dst[i]     = r;
+        dst[i + 1] = gv;
+        dst[i + 2] = b;
+        dst[i + 3] = 255;
       }
     }
+    g.putImageData(out, 0, 0);
+
+    const gen = ++renderGen[surface];
+    c.toBlob((blob) => {
+      if (!blob) return;
+      if (gen !== renderGen[surface]) return; // stale — newer render queued
+      const url = URL.createObjectURL(blob);
+      const prev = imgEl.dataset.blobUrl;
+      imgEl.dataset.blobUrl = url;
+      imgEl.setAttribute("href", url);
+      if (prev) URL.revokeObjectURL(prev);
+    }, "image/png");
   }
 
   function applyAllSelections() {
-    for (const s of SURFACES) updateSurfaceFilter(s);
+    for (const s of SURFACES) scheduleRender(s);
     updateSurfaceSwatches();
     updateSelectionReadout();
   }
@@ -183,7 +386,7 @@
     const swatch = $("big-swatch");
     swatch.style.background = sel.hex || "#eee";
     $("sel-name").textContent = sel.name || "— no color selected —";
-    $("sel-code").textContent = sel.code || "\u00A0";
+    $("sel-code").textContent = sel.code || " ";
     const exp = $("exposure");
     const expVal = $("exposure-val");
     exp.value = sel.exposure || 1.0;
@@ -253,7 +456,6 @@
       let y = r.top - 6;
       tip.style.left = x + "px";
       tip.style.top = y + "px";
-      // Clamp horizontally so it stays in the viewport.
       const tr = tip.getBoundingClientRect();
       const margin = 4;
       if (tr.left < margin) {
@@ -261,7 +463,6 @@
       } else if (tr.right > window.innerWidth - margin) {
         tip.style.left = (x - (tr.right - (window.innerWidth - margin))) + "px";
       }
-      // Flip below if it would clip the top.
       if (tr.top < margin) {
         tip.style.top = (r.bottom + 6 + tr.height) + "px";
       }
@@ -284,7 +485,7 @@
     state.selections[s].name = color.name;
     state.selections[s].code = color.code;
     saveJSON(LS_SEL, state.selections);
-    updateSurfaceFilter(s);
+    scheduleRender(s);
     updateSurfaceSwatches();
     updateSelectionReadout();
     markSelectedSwatch();
@@ -301,7 +502,6 @@
   const FULL_CATALOG_LIMIT = 60;
 
   function normalizeCodeQuery(q) {
-    // "sw 6234" / "SW6234" / "6234" -> "6234" for digit matching.
     return q.replace(/\s+/g, "").replace(/^sw/i, "").toLowerCase();
   }
 
@@ -386,7 +586,7 @@
       state.selections[s].exposure = v;
       val.textContent = v.toFixed(2);
       saveJSON(LS_SEL, state.selections);
-      updateSurfaceFilter(s);
+      scheduleRender(s);
     });
   }
 
@@ -405,7 +605,7 @@
     const hint = $("combos-hint");
     list.textContent = "";
     if (!state.combos.length) {
-      hint.textContent = "None yet — use \u201CSave combo\u201D";
+      hint.textContent = "None yet — use “Save combo”";
       return;
     }
     hint.textContent = `${state.combos.length} saved`;
@@ -458,12 +658,151 @@
   function saveCurrentCombo() {
     const name = prompt("Name this combo:", `Option ${state.combos.length + 1}`);
     if (!name) return;
-    // Deep clone selections
     const snap = {};
     for (const s of SURFACES) snap[s] = { ...state.selections[s] };
     state.combos.push({ name: name.trim(), selections: snap });
     saveJSON(LS_COMBOS, state.combos);
     renderCombos();
+  }
+
+  // ---------- Albedo editor UI ----------
+  function renderAlbedoRows() {
+    const host = $("albedo-rows");
+    if (!host) return;
+    host.textContent = "";
+    for (const s of SURFACES) {
+      const a = state.albedos[s];
+      const eff = effectiveAlbedo(s);
+      const sampling = state.sampling && state.sampling.surface === s;
+      const tagText = sampling ? "sampling…" : (a.manual ? "manual" : (a.auto ? "auto" : "none"));
+      const tagClass = sampling ? "is-sampling" : (a.manual ? "is-manual" : "");
+
+      const row = document.createElement("div");
+      row.className = "albedo-row";
+
+      const label = document.createElement("div");
+      label.className = "albedo-row-label";
+      label.textContent = s;
+
+      const swatch = document.createElement("div");
+      swatch.className = "albedo-swatch";
+      swatch.style.background = eff ? rgb01ToHex(eff) : "#eee";
+
+      const meta = document.createElement("div");
+      meta.className = "albedo-meta";
+      meta.textContent = eff ? rgb01ToHex(eff).toUpperCase() : "—";
+      const tag = document.createElement("span");
+      tag.className = "albedo-tag " + tagClass;
+      tag.textContent = tagText;
+      meta.appendChild(tag);
+
+      const sampleBtn = document.createElement("button");
+      sampleBtn.type = "button";
+      sampleBtn.className = "btn-small" + (sampling ? " is-armed" : "");
+      sampleBtn.textContent = sampling ? "Cancel" : "Sample";
+      sampleBtn.title = "Pick a pixel from the photo to set this surface's albedo";
+      sampleBtn.addEventListener("click", () => {
+        if (sampling) cancelSample();
+        else armSample(s);
+      });
+
+      const resetBtn = document.createElement("button");
+      resetBtn.type = "button";
+      resetBtn.className = "btn-link";
+      resetBtn.textContent = "Reset";
+      resetBtn.title = "Drop manual sample and recompute from mask pixels";
+      resetBtn.disabled = !a.manual;
+      resetBtn.addEventListener("click", () => resetAlbedo(s));
+
+      row.appendChild(label);
+      row.appendChild(swatch);
+      row.appendChild(meta);
+      row.appendChild(sampleBtn);
+      row.appendChild(resetBtn);
+      host.appendChild(row);
+    }
+  }
+
+  function armSample(surface) {
+    if (state.sampling) cancelSample();
+    state.sampling = { surface };
+    document.body.dataset.sampling = surface;
+    renderAlbedoRows();
+    // Capture-phase click on the stage intercepts the click before the
+    // mask editor's polygon-point handler sees it.
+    const handler = (e) => {
+      if (e.button !== 0) return;
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      const pt = clientToImagePx(e.clientX, e.clientY);
+      if (pt && state.baseImageData) {
+        const rgb = sampleNeighborhood(pt.x, pt.y, SAMPLE_RADIUS);
+        if (rgb) {
+          state.albedos[surface].manual = rgb;
+          saveJSON(LS_ALBEDOS, state.albedos);
+          scheduleRender(surface);
+        }
+      }
+      finishSample();
+    };
+    state._sampleHandler = handler;
+    stage.addEventListener("click", handler, true);
+  }
+
+  function cancelSample() {
+    if (!state.sampling) return;
+    finishSample();
+  }
+
+  function finishSample() {
+    if (state._sampleHandler) {
+      stage.removeEventListener("click", state._sampleHandler, true);
+      state._sampleHandler = null;
+    }
+    state.sampling = null;
+    delete document.body.dataset.sampling;
+    renderAlbedoRows();
+  }
+
+  function resetAlbedo(surface) {
+    state.albedos[surface].manual = null;
+    saveJSON(LS_ALBEDOS, state.albedos);
+    renderAlbedoRows();
+    scheduleRender(surface);
+  }
+
+  function clientToImagePx(cx, cy) {
+    const pt = stage.createSVGPoint();
+    pt.x = cx; pt.y = cy;
+    const ctm = stage.getScreenCTM();
+    if (!ctm) return null;
+    const sp = pt.matrixTransform(ctm.inverse());
+    const { width, height } = state.image;
+    const x = Math.round(sp.x);
+    const y = Math.round(sp.y);
+    if (x < 0 || y < 0 || x >= width || y >= height) return null;
+    return { x, y };
+  }
+
+  function sampleNeighborhood(cx, cy, radius) {
+    const data = state.baseImageData.data;
+    const { width, height } = state.image;
+    let rSum = 0, gSum = 0, bSum = 0, n = 0;
+    const x0 = Math.max(0, cx - radius);
+    const y0 = Math.max(0, cy - radius);
+    const x1 = Math.min(width - 1, cx + radius);
+    const y1 = Math.min(height - 1, cy + radius);
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const i = (y * width + x) * 4;
+        rSum += data[i];
+        gSum += data[i + 1];
+        bSum += data[i + 2];
+        n++;
+      }
+    }
+    if (!n) return null;
+    return [rSum / n / 255, gSum / n / 255, bSum / n / 255];
   }
 
   // ---------- UI: edit mode toggle ----------
@@ -475,26 +814,49 @@
         onChange: () => {
           persistMasks();
           renderMasks();
+          // Masks changed — rebuild bitmaps, recompute auto albedos (manual
+          // overrides persist), re-render every surface.
+          rebuildSurfaceMasks();
+          autoComputeAllAlbedos();
+          renderAlbedoRows();
+          scheduleRender();
         },
         onExit: () => {
+          cancelSample();
           document.body.dataset.mode = "view";
           $("mode-hint").textContent = "Pick colors for siding, trim, and stucco →";
           persistMasks();
           renderMasks();
+          rebuildSurfaceMasks();
+          autoComputeAllAlbedos();
           applyAllSelections();
         },
       });
       document.body.dataset.mode = "edit";
-      $("mode-hint").textContent = "Editing masks — click to add points, Enter to close polygon.";
+      $("mode-hint").textContent = "Options — rendering algorithm, masks, albedos.";
+      renderAlbedoRows();
     });
     $("btn-done-editing").addEventListener("click", () => {
       window.MaskEditor.exit();
     });
   }
 
+  // ---------- UI: rendering algorithm toggle ----------
+  function wireAlgorithmToggle() {
+    const radios = document.querySelectorAll('input[name="algorithm"]');
+    for (const r of radios) {
+      r.checked = r.value === state.algorithm;
+      r.addEventListener("change", () => {
+        if (!r.checked) return;
+        state.algorithm = r.value;
+        saveJSON(LS_ALGORITHM, state.algorithm);
+        scheduleRender();
+      });
+    }
+  }
+
   // ---------- Init ----------
   function init() {
-    // Surface tabs
     document.querySelectorAll("#surface-tabs .surface-tab").forEach(b => {
       b.addEventListener("click", () => setActiveSurface(b.dataset.surface));
     });
@@ -504,11 +866,13 @@
     wireBeforeAfter();
     $("btn-save-combo").addEventListener("click", saveCurrentCombo);
     wireEditMode();
+    wireAlgorithmToggle();
 
     renderCombos();
     updateSelectionReadout();
     updateSurfaceSwatches();
     markSelectedSwatch();
+    renderAlbedoRows();
     loadBaseImage();
   }
 

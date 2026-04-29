@@ -105,6 +105,8 @@ body[data-mode="view"] #editor-layer { display: none; }
 body[data-mode="edit"] .photo-pane { cursor: crosshair; }
 body[data-mode="edit"] #stage { cursor: crosshair; }
 body[data-mode="edit"][data-panning="true"] #stage { cursor: grab; }
+body[data-mode="edit"][data-sampling] #stage,
+body[data-mode="edit"][data-sampling] .photo-pane { cursor: crosshair; }
 body.before-active .recolor-layer { display: none; }
 
 #editor-layer .mask-polygon {
@@ -325,7 +327,43 @@ body.before-active .recolor-layer { display: none; }
   color: #6a645a;
   margin-bottom: 6px;
 }
+.edit-only h4 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6a645a;
+  margin: 16px 0 6px;
+}
 .edit-only p.hint { margin: 0 0 10px; color: #4a463e; }
+
+.algorithm-section {
+  margin: 0 0 12px;
+}
+.algorithm-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  margin: 0 0 6px;
+  border: 1px solid #e5dec9;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+.algorithm-row input { margin-top: 3px; }
+.algorithm-row strong { font-weight: 600; }
+.algorithm-row .hint {
+  font-size: 11px;
+  color: #6a645a;
+  margin-left: 4px;
+}
+.algorithm-desc {
+  display: block;
+  font-size: 12px;
+  color: #4a463e;
+  margin-top: 2px;
+  line-height: 1.4;
+}
 .shortcuts {
   list-style: none;
   padding: 10px;
@@ -358,6 +396,96 @@ body.before-active .recolor-layer { display: none; }
   gap: 6px;
 }
 .edit-actions .btn-primary { grid-column: span 2; }
+
+/* ========== Albedo editor ========== */
+.albedo-section { margin: 14px 0 10px; }
+.albedo-section .hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #4a463e;
+}
+.albedo-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.albedo-row {
+  display: grid;
+  grid-template-columns: 70px 32px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: #fff;
+  border: 1px solid #e5dec9;
+  border-radius: 4px;
+}
+.albedo-row-label {
+  font-weight: 500;
+  text-transform: capitalize;
+}
+.albedo-swatch {
+  width: 28px; height: 28px;
+  border-radius: 3px;
+  background: #eee;
+  border: 1px solid rgba(0,0,0,0.15);
+}
+.albedo-meta {
+  font: 11px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #6a645a;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.albedo-meta .albedo-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 10px;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  background: #ede5d0;
+  color: #6a645a;
+  text-transform: uppercase;
+}
+.albedo-meta .albedo-tag.is-manual {
+  background: #fff4d1;
+  color: #8a6400;
+}
+.albedo-meta .albedo-tag.is-sampling {
+  background: #ffdf99;
+  color: #5a4000;
+}
+.albedo-row .btn-small {
+  padding: 3px 8px;
+  font-size: 12px;
+  border: 1px solid #bfb6a6;
+  background: #f7f5f1;
+  color: #1f1d1a;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.albedo-row .btn-small:hover { background: #eee8db; }
+.albedo-row .btn-small.is-armed {
+  background: #fff4d1;
+  border-color: #d6b56a;
+}
+.albedo-row .btn-link {
+  border: 0;
+  background: transparent;
+  color: #6a645a;
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 2px 4px;
+}
+.albedo-row .btn-link:hover { color: #1f1d1a; }
+.albedo-row .btn-link[disabled] {
+  color: #bfb6a6;
+  cursor: default;
+  text-decoration: none;
+}
 
 /* ========== Photo note (no image) ========== */
 .photo-note {

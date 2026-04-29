@@ -19,7 +19,7 @@
         Show original
       </button>
       <button id="btn-save-combo" class="btn">Save combo&hellip;</button>
-      <button id="btn-edit-masks" class="btn btn-secondary">Edit masks</button>
+      <button id="btn-edit-masks" class="btn btn-secondary">Options</button>
     </div>
   </header>
 
@@ -34,89 +34,23 @@
             <clipPath id="clip-siding" clipPathUnits="userSpaceOnUse"></clipPath>
             <clipPath id="clip-trim"   clipPathUnits="userSpaceOnUse"></clipPath>
             <clipPath id="clip-stucco" clipPathUnits="userSpaceOnUse"></clipPath>
-
-            <!--
-              Luminance-preserving tint filter per surface.
-              Step 1 (grayscale) is static.
-              Step 2's first three rows are updated by app.js to
-              encode the target color: [tR 0 0 0 0 / 0 tG 0 0 0 / 0 0 tB 0 0].
-              feComponentTransfer in between lets us brighten dark regions
-              (per-surface exposure slider, defaults to 1.0 = no change).
-            -->
-            <filter id="tint-siding" color-interpolation-filters="sRGB"
-                    x="0" y="0" width="100%" height="100%">
-              <feColorMatrix type="matrix" values="
-                0.2126 0.7152 0.0722 0 0
-                0.2126 0.7152 0.0722 0 0
-                0.2126 0.7152 0.0722 0 0
-                0      0      0      1 0" result="gray"/>
-              <feComponentTransfer in="gray" result="adj">
-                <feFuncR type="linear" slope="1" intercept="0"/>
-                <feFuncG type="linear" slope="1" intercept="0"/>
-                <feFuncB type="linear" slope="1" intercept="0"/>
-              </feComponentTransfer>
-              <feColorMatrix in="adj" type="matrix" values="
-                1 0 0 0 0
-                0 1 0 0 0
-                0 0 1 0 0
-                0 0 0 1 0"/>
-            </filter>
-            <filter id="tint-trim" color-interpolation-filters="sRGB"
-                    x="0" y="0" width="100%" height="100%">
-              <feColorMatrix type="matrix" values="
-                0.2126 0.7152 0.0722 0 0
-                0.2126 0.7152 0.0722 0 0
-                0.2126 0.7152 0.0722 0 0
-                0      0      0      1 0" result="gray"/>
-              <feComponentTransfer in="gray" result="adj">
-                <feFuncR type="linear" slope="1" intercept="0"/>
-                <feFuncG type="linear" slope="1" intercept="0"/>
-                <feFuncB type="linear" slope="1" intercept="0"/>
-              </feComponentTransfer>
-              <feColorMatrix in="adj" type="matrix" values="
-                1 0 0 0 0
-                0 1 0 0 0
-                0 0 1 0 0
-                0 0 0 1 0"/>
-            </filter>
-            <filter id="tint-stucco" color-interpolation-filters="sRGB"
-                    x="0" y="0" width="100%" height="100%">
-              <feColorMatrix type="matrix" values="
-                0.2126 0.7152 0.0722 0 0
-                0.2126 0.7152 0.0722 0 0
-                0.2126 0.7152 0.0722 0 0
-                0      0      0      1 0" result="gray"/>
-              <feComponentTransfer in="gray" result="adj">
-                <feFuncR type="linear" slope="1" intercept="0"/>
-                <feFuncG type="linear" slope="1" intercept="0"/>
-                <feFuncB type="linear" slope="1" intercept="0"/>
-              </feComponentTransfer>
-              <feColorMatrix in="adj" type="matrix" values="
-                1 0 0 0 0
-                0 1 0 0 0
-                0 0 1 0 0
-                0 0 0 1 0"/>
-            </filter>
           </defs>
 
           <!-- Base photo -->
           <image id="base-image" href="house.jpg" x="0" y="0"/>
 
-          <!-- Recolored surfaces: same image, clipped + tinted -->
+          <!-- Recolored surfaces: per-surface canvas output, clipped to each surface. -->
           <g id="layer-siding" class="recolor-layer">
-            <image href="house.jpg" x="0" y="0"
-                   clip-path="url(#clip-siding)"
-                   filter="url(#tint-siding)"/>
+            <image id="recolor-siding" href="" x="0" y="0"
+                   clip-path="url(#clip-siding)"/>
           </g>
           <g id="layer-trim" class="recolor-layer">
-            <image href="house.jpg" x="0" y="0"
-                   clip-path="url(#clip-trim)"
-                   filter="url(#tint-trim)"/>
+            <image id="recolor-trim" href="" x="0" y="0"
+                   clip-path="url(#clip-trim)"/>
           </g>
           <g id="layer-stucco" class="recolor-layer">
-            <image href="house.jpg" x="0" y="0"
-                   clip-path="url(#clip-stucco)"
-                   filter="url(#tint-stucco)"/>
+            <image id="recolor-stucco" href="" x="0" y="0"
+                   clip-path="url(#clip-stucco)"/>
           </g>
 
           <!-- Editor-only layer: polygon previews + vertex handles -->
@@ -127,6 +61,14 @@
       <div class="photo-note" id="photo-note" hidden>
         <strong>No photo found.</strong> Save your house picture as
         <code>house.jpg</code> inside this folder, then refresh.
+      </div>
+
+      <div class="photo-note" id="taint-note" hidden>
+        <strong>Open this page via a local server.</strong>
+        Browsers block pixel access to local images loaded over
+        <code>file://</code>, which the albedo pipeline needs. Run:
+        <br/><code>python3 -m http.server -d .</code>
+        <br/>from this folder, then visit <code>http://localhost:8000/</code>.
       </div>
     </section>
 
@@ -187,15 +129,42 @@
         </div>
 
         <p class="disclaimer">
-          Hex values are real Sherwin-Williams colors but will appear different under real lighting
-          (<a href="https://arimwilson.github.io/housevisualization/COLORACCURACY.md">detailed explanation</a>).
+          Hex values are real Sherwin-Williams colors but will appear different under real lighting.
           Order real paint chips before committing.
         </p>
       </div>
 
-      <!-- EDIT MODE controls -->
+      <!-- OPTIONS MODE controls -->
       <div class="edit-only">
-        <h3>Mask editor</h3>
+        <h3>Options</h3>
+
+        <section class="algorithm-section">
+          <h4>Rendering algorithm</h4>
+          <label class="algorithm-row">
+            <input type="radio" name="algorithm" value="albedo" />
+            <span>
+              <strong>Albedo-aware</strong> <span class="hint">(default)</span>
+              <span class="algorithm-desc">
+                Divides out the photo's baked-in shading, then multiplies by
+                the target color. Dark&rarr;light swaps read as shaded light
+                instead of muddy gray. Needs a per-surface albedo.
+              </span>
+            </span>
+          </label>
+          <label class="algorithm-row">
+            <input type="radio" name="algorithm" value="legacy" />
+            <span>
+              <strong>Legacy luma tint</strong>
+              <span class="algorithm-desc">
+                Simple grayscale-times-target tint. Preserves the photo's
+                original contrast exactly, but dark surfaces stay muddy
+                when painted with light colors.
+              </span>
+            </span>
+          </label>
+        </section>
+
+        <h4>Mask editor</h4>
         <p class="hint">
           Click on the photo to add polygon points. Press
           <kbd>Enter</kbd> to close a polygon and assign it to the active
@@ -220,12 +189,24 @@
 
         <div class="edit-counts" id="edit-counts"></div>
 
+        <div class="albedo-section">
+          <h4>Surface albedos</h4>
+          <p class="hint">
+            The real paint color of each surface, used to undo the photo's
+            baked-in lighting so dark&rarr;light swaps read correctly.
+            Auto-computed from the brightest diffuse pixels in each surface's
+            masks (95th percentile, to skip specular outliers); use
+            <em>Sample</em> to pick a specific pixel if auto looks off.
+          </p>
+          <div class="albedo-rows" id="albedo-rows"></div>
+        </div>
+
         <div class="edit-actions">
           <button id="btn-clear-surface" class="btn btn-danger">Clear active surface</button>
           <button id="btn-export-masks"  class="btn">Export masks JSON</button>
           <button id="btn-import-masks"  class="btn">Import masks JSON</button>
           <input type="file" id="import-file" accept=".json,application/json" hidden />
-          <button id="btn-done-editing"  class="btn btn-primary">Done editing</button>
+          <button id="btn-done-editing"  class="btn btn-primary">Done</button>
         </div>
       </div>
 
