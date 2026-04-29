@@ -12,6 +12,10 @@
   const LS_SEL   = "hv:selections";
   const LS_COMBOS = "hv:combos";
   const LS_ALBEDOS = "hv:albedos";
+  const LS_ALGORITHM = "hv:algorithm";
+
+  const ALGO_ALBEDO = "albedo";
+  const ALGO_LEGACY = "legacy";
 
   // Lower bound per channel before dividing src/albedo — guards against
   // blow-up from a near-black albedo sample.
@@ -35,6 +39,7 @@
     masks: loadJSON(LS_MASKS, window.DEFAULT_MASKS),
     combos: loadJSON(LS_COMBOS, []),
     albedos: loadJSON(LS_ALBEDOS, defaultAlbedos()),
+    algorithm: loadJSON(LS_ALGORITHM, ALGO_ALBEDO),
     image: { width: 0, height: 0, loaded: false },
     baseImageData: null,   // ImageData of house.jpg at natural resolution
     surfaceMasks: {},      // { siding: Uint8Array, trim: …, stucco: … }
@@ -51,6 +56,9 @@
   // Repair albedo shape if stored from an older build.
   for (const s of SURFACES) {
     if (!state.albedos[s]) state.albedos[s] = { auto: null, manual: null };
+  }
+  if (state.algorithm !== ALGO_ALBEDO && state.algorithm !== ALGO_LEGACY) {
+    state.algorithm = ALGO_ALBEDO;
   }
 
   // ---------- DOM ----------
@@ -183,7 +191,12 @@
   }
 
   // ---------- Albedo auto-compute ----------
-  // Per-channel median via histogram: O(N) over the mask pixels, no sort.
+  // Per-channel 95th-percentile via histogram: O(N) over the mask pixels, no
+  // sort. Using a high percentile (rather than the median) anchors albedo near
+  // the brightest diffuse reading on the surface, so `src/albedo` stays in
+  // [0,1] across the whole surface without clamping — the 95th (vs 99th/max)
+  // trims specular highlights and stray bright outliers.
+  const ALBEDO_PERCENTILE = 0.95;
   function computeAutoAlbedo(surface) {
     if (!state.baseImageData || !state.surfaceMasks[surface]) return null;
     const src = state.baseImageData.data;
@@ -200,14 +213,18 @@
       n++;
     }
     if (!n) return null;
-    return [medianFromHist(histR, n), medianFromHist(histG, n), medianFromHist(histB, n)];
+    return [
+      percentileFromHist(histR, n, ALBEDO_PERCENTILE),
+      percentileFromHist(histG, n, ALBEDO_PERCENTILE),
+      percentileFromHist(histB, n, ALBEDO_PERCENTILE),
+    ];
   }
-  function medianFromHist(hist, n) {
-    const half = n / 2;
+  function percentileFromHist(hist, n, p) {
+    const target = n * p;
     let count = 0;
     for (let v = 0; v < 256; v++) {
       count += hist[v];
-      if (count >= half) return v / 255;
+      if (count >= target) return v / 255;
     }
     return 1;
   }
@@ -255,9 +272,14 @@
       return;
     }
     const mask = state.surfaceMasks[surface];
-    const albedo = effectiveAlbedo(surface);
-    if (!mask || !mask.length || !albedo) {
-      // No polygons drawn for this surface (or no albedo to divide out yet).
+    if (!mask || !mask.length) {
+      layer.style.display = "none";
+      return;
+    }
+    const useAlbedo = state.algorithm === ALGO_ALBEDO;
+    const albedo = useAlbedo ? effectiveAlbedo(surface) : null;
+    if (useAlbedo && !albedo) {
+      // Albedo algorithm selected but nothing to divide out yet.
       layer.style.display = "none";
       return;
     }
@@ -266,9 +288,9 @@
     const { width, height } = state.image;
     const [tR, tG, tB] = hexToRgb01(sel.hex);
     const exposure = sel.exposure || 1.0;
-    const a0 = Math.max(ALBEDO_FLOOR, albedo[0]);
-    const a1 = Math.max(ALBEDO_FLOOR, albedo[1]);
-    const a2 = Math.max(ALBEDO_FLOOR, albedo[2]);
+    const a0 = useAlbedo ? Math.max(ALBEDO_FLOOR, albedo[0]) : 1;
+    const a1 = useAlbedo ? Math.max(ALBEDO_FLOOR, albedo[1]) : 1;
+    const a2 = useAlbedo ? Math.max(ALBEDO_FLOOR, albedo[2]) : 1;
     const src = state.baseImageData.data;
 
     let c = renderCanvases[surface];
@@ -286,21 +308,40 @@
     // small and lets us drop the clip-path later if we ever want to).
     const out = g.createImageData(width, height);
     const dst = out.data;
-    for (let j = 0, i = 0; j < mask.length; j++, i += 4) {
-      if (!mask[j]) continue;
-      const ilR = Math.min(1, (src[i]     / 255) / a0);
-      const ilG = Math.min(1, (src[i + 1] / 255) / a1);
-      const ilB = Math.min(1, (src[i + 2] / 255) / a2);
-      let r = ilR * tR * exposure * 255;
-      let gv = ilG * tG * exposure * 255;
-      let b = ilB * tB * exposure * 255;
-      if (r > 255) r = 255;
-      if (gv > 255) gv = 255;
-      if (b > 255) b = 255;
-      dst[i]     = r;
-      dst[i + 1] = gv;
-      dst[i + 2] = b;
-      dst[i + 3] = 255;
+    if (useAlbedo) {
+      for (let j = 0, i = 0; j < mask.length; j++, i += 4) {
+        if (!mask[j]) continue;
+        const ilR = Math.min(1, (src[i]     / 255) / a0);
+        const ilG = Math.min(1, (src[i + 1] / 255) / a1);
+        const ilB = Math.min(1, (src[i + 2] / 255) / a2);
+        let r = ilR * tR * exposure * 255;
+        let gv = ilG * tG * exposure * 255;
+        let b = ilB * tB * exposure * 255;
+        if (r > 255) r = 255;
+        if (gv > 255) gv = 255;
+        if (b > 255) b = 255;
+        dst[i]     = r;
+        dst[i + 1] = gv;
+        dst[i + 2] = b;
+        dst[i + 3] = 255;
+      }
+    } else {
+      // Legacy luma-tint: out = luma(src) * target * exposure.
+      // Rec.709 weights, same as the original SVG feColorMatrix filter.
+      for (let j = 0, i = 0; j < mask.length; j++, i += 4) {
+        if (!mask[j]) continue;
+        const y = (0.2126 * src[i] + 0.7152 * src[i + 1] + 0.0722 * src[i + 2]) / 255;
+        let r = y * tR * exposure * 255;
+        let gv = y * tG * exposure * 255;
+        let b = y * tB * exposure * 255;
+        if (r > 255) r = 255;
+        if (gv > 255) gv = 255;
+        if (b > 255) b = 255;
+        dst[i]     = r;
+        dst[i + 1] = gv;
+        dst[i + 2] = b;
+        dst[i + 3] = 255;
+      }
     }
     g.putImageData(out, 0, 0);
 
@@ -669,7 +710,7 @@
       resetBtn.type = "button";
       resetBtn.className = "btn-link";
       resetBtn.textContent = "Reset";
-      resetBtn.title = "Drop manual sample and recompute from median of mask pixels";
+      resetBtn.title = "Drop manual sample and recompute from mask pixels";
       resetBtn.disabled = !a.manual;
       resetBtn.addEventListener("click", () => resetAlbedo(s));
 
@@ -792,12 +833,26 @@
         },
       });
       document.body.dataset.mode = "edit";
-      $("mode-hint").textContent = "Editing masks — click to add points, Enter to close polygon.";
+      $("mode-hint").textContent = "Options — rendering algorithm, masks, albedos.";
       renderAlbedoRows();
     });
     $("btn-done-editing").addEventListener("click", () => {
       window.MaskEditor.exit();
     });
+  }
+
+  // ---------- UI: rendering algorithm toggle ----------
+  function wireAlgorithmToggle() {
+    const radios = document.querySelectorAll('input[name="algorithm"]');
+    for (const r of radios) {
+      r.checked = r.value === state.algorithm;
+      r.addEventListener("change", () => {
+        if (!r.checked) return;
+        state.algorithm = r.value;
+        saveJSON(LS_ALGORITHM, state.algorithm);
+        scheduleRender();
+      });
+    }
   }
 
   // ---------- Init ----------
@@ -811,6 +866,7 @@
     wireBeforeAfter();
     $("btn-save-combo").addEventListener("click", saveCurrentCombo);
     wireEditMode();
+    wireAlgorithmToggle();
 
     renderCombos();
     updateSelectionReadout();

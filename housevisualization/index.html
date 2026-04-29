@@ -19,7 +19,7 @@
         Show original
       </button>
       <button id="btn-save-combo" class="btn">Save combo&hellip;</button>
-      <button id="btn-edit-masks" class="btn btn-secondary">Edit masks</button>
+      <button id="btn-edit-masks" class="btn btn-secondary">Options</button>
     </div>
   </header>
 
@@ -135,9 +135,37 @@
         </p>
       </div>
 
-      <!-- EDIT MODE controls -->
+      <!-- OPTIONS MODE controls -->
       <div class="edit-only">
-        <h3>Mask editor</h3>
+        <h3>Options</h3>
+
+        <section class="algorithm-section">
+          <h4>Rendering algorithm</h4>
+          <label class="algorithm-row">
+            <input type="radio" name="algorithm" value="albedo" />
+            <span>
+              <strong>Albedo-aware</strong> <span class="hint">(default)</span>
+              <span class="algorithm-desc">
+                Divides out the photo's baked-in shading, then multiplies by
+                the target color. Dark&rarr;light swaps read as shaded light
+                instead of muddy gray. Needs a per-surface albedo.
+              </span>
+            </span>
+          </label>
+          <label class="algorithm-row">
+            <input type="radio" name="algorithm" value="legacy" />
+            <span>
+              <strong>Legacy luma tint</strong>
+              <span class="algorithm-desc">
+                Simple grayscale-times-target tint. Preserves the photo's
+                original contrast exactly, but dark surfaces stay muddy
+                when painted with light colors.
+              </span>
+            </span>
+          </label>
+        </section>
+
+        <h4>Mask editor</h4>
         <p class="hint">
           Click on the photo to add polygon points. Press
           <kbd>Enter</kbd> to close a polygon and assign it to the active
@@ -163,12 +191,13 @@
         <div class="edit-counts" id="edit-counts"></div>
 
         <div class="albedo-section">
-          <h3>Surface albedos</h3>
+          <h4>Surface albedos</h4>
           <p class="hint">
             The real paint color of each surface, used to undo the photo's
             baked-in lighting so dark&rarr;light swaps read correctly.
-            Auto-computed as the median RGB inside each surface's masks;
-            use <em>Sample</em> to pick a specific pixel if auto looks off.
+            Auto-computed from the brightest diffuse pixels in each surface's
+            masks (95th percentile, to skip specular outliers); use
+            <em>Sample</em> to pick a specific pixel if auto looks off.
           </p>
           <div class="albedo-rows" id="albedo-rows"></div>
         </div>
@@ -178,7 +207,7 @@
           <button id="btn-export-masks"  class="btn">Export masks JSON</button>
           <button id="btn-import-masks"  class="btn">Import masks JSON</button>
           <input type="file" id="import-file" accept=".json,application/json" hidden />
-          <button id="btn-done-editing"  class="btn btn-primary">Done editing</button>
+          <button id="btn-done-editing"  class="btn btn-primary">Done</button>
         </div>
       </div>
 
