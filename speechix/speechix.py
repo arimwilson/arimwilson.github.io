@@ -12,6 +12,7 @@ import argparse
 import sys
 import tempfile
 import wave
+import aifc
 from pathlib import Path
 
 import numpy as np
@@ -25,6 +26,36 @@ try:
     import sounddevice as sd
 except ImportError:
     sd = None
+
+
+def _load_pcm_from_file(path: Path) -> tuple[np.ndarray, int, int]:
+    with path.open("rb") as f:
+        magic = f.read(12)
+
+    if magic.startswith(b"RIFF"):
+        with wave.open(str(path), "rb") as wf:
+            channels = wf.getnchannels()
+            sample_width = wf.getsampwidth()
+            sample_rate = wf.getframerate()
+            nframes = wf.getnframes()
+            raw = wf.readframes(nframes)
+    elif magic[0:4] == b"FORM":
+        with aifc.open(str(path), "rb") as af:
+            channels = af.getnchannels()
+            sample_width = af.getsampwidth()
+            sample_rate = af.getframerate()
+            nframes = af.getnframes()
+            raw = af.readframes(nframes)
+    else:
+        raise ValueError("Unsupported TTS output format (expected WAV/AIFF)")
+
+    if sample_width != 2:
+        raise ValueError(f"Unsupported sample width: {sample_width} bytes")
+
+    data = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    if channels > 1:
+        data = data.reshape(-1, channels).mean(axis=1)
+    return data, sample_rate, channels
 
 
 def synthesize_tts_to_array(text: str, rate_wpm: int) -> tuple[np.ndarray, int]:
@@ -42,19 +73,7 @@ def synthesize_tts_to_array(text: str, rate_wpm: int) -> tuple[np.ndarray, int]:
         engine.save_to_file(text, str(wav_path))
         engine.runAndWait()
 
-        with wave.open(str(wav_path), "rb") as wf:
-            channels = wf.getnchannels()
-            sample_width = wf.getsampwidth()
-            sample_rate = wf.getframerate()
-            nframes = wf.getnframes()
-            raw = wf.readframes(nframes)
-
-        if sample_width != 2:
-            raise ValueError(f"Unsupported WAV sample width: {sample_width} bytes")
-
-        data = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
-        if channels > 1:
-            data = data.reshape(-1, channels).mean(axis=1)
+        data, sample_rate, _channels = _load_pcm_from_file(wav_path)
 
         peak = np.max(np.abs(data)) if data.size else 0.0
         if peak > 0:
