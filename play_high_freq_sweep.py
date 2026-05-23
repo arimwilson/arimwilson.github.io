@@ -14,8 +14,7 @@ import numpy as np
 try:
     import sounddevice as sd
 except ImportError:
-    print("Missing dependency: sounddevice. Install with: pip install sounddevice", file=sys.stderr)
-    raise
+    sd = None
 
 
 def play_tone(frequency_hz: int, duration_s: float, sample_rate: int, amplitude: float) -> None:
@@ -29,6 +28,8 @@ def play_tone(frequency_hz: int, duration_s: float, sample_rate: int, amplitude:
     waveform[:fade_samples] *= fade_in
     waveform[-fade_samples:] *= fade_out
 
+    if sd is None:
+        raise RuntimeError("sounddevice is not installed")
     sd.play(waveform.astype(np.float32), samplerate=sample_rate, blocking=True)
 
 
@@ -43,6 +44,11 @@ def main() -> None:
     parser.add_argument("--sample-rate", type=int, default=48000, help="Sample rate in Hz (default: 48000)")
     parser.add_argument("--amplitude", type=float, default=0.15, help="Amplitude 0.0-1.0 (default: 0.15)")
     args = parser.parse_args()
+
+    if sd is None:
+        print("Missing dependency: sounddevice. Install with: pip install sounddevice", file=sys.stderr)
+        print("Tip: If pip install fails, install PortAudio first (e.g., brew install portaudio).", file=sys.stderr)
+        sys.exit(2)
 
     if args.start_khz <= 0 or args.end_khz <= 0 or args.step_khz <= 0:
         raise ValueError("start/end/step must be positive")
@@ -73,7 +79,8 @@ def main() -> None:
     except KeyboardInterrupt:
         print("\nStopped by user.")
     finally:
-        sd.stop()
+        if sd is not None:
+            sd.stop()
 
 
 if __name__ == "__main__":
