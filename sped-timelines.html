@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IEP timeline check (California)</title>
+<style>
+  :root { --ink:#1d2433; --muted:#5b6475; --line:#e3e6ec; --bg:#f7f8fa; --card:#fff;
+          --overdue:#b42318; --late:#b54708; --soon:#8a6100; --ok:#475467; --met:#067647; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color:var(--ink); background:var(--bg); }
+  header { padding:20px 28px 12px; background:var(--card); border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 4px; font-size:20px; }
+  h2 { font-size:15px; margin:0 0 10px; }
+  .sub { color:var(--muted); margin:0; }
+  main { padding:18px 28px 40px; max-width:1180px; }
+  .controls { display:flex; gap:18px; align-items:end; flex-wrap:wrap; margin-bottom:16px; }
+  label { display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--muted); }
+  input[type=date] { font:inherit; padding:5px 8px; border:1px solid var(--line); border-radius:6px; }
+  button { font:inherit; padding:6px 12px; border:1px solid var(--line); background:var(--card); border-radius:6px; cursor:pointer; }
+  button:hover { border-color:#b8bfcc; }
+  .tiles { display:grid; grid-template-columns:repeat(4, minmax(150px, 1fr)); gap:12px; margin-bottom:18px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .tile .n { font-size:26px; font-weight:650; }
+  .tile .k { color:var(--muted); font-size:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:16px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-size:12px; color:var(--muted); font-weight:600; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .chip { display:inline-block; min-width:64px; text-align:center; padding:1px 8px; border-radius:999px; font-size:12px; font-weight:600; border:1px solid currentColor; }
+  .chip.overdue { color:var(--overdue); background:#fef3f2; } .chip.late { color:var(--late); background:#fffaeb; }
+  .chip.soon { color:var(--soon); background:#fefbe8; } .chip.ok { color:var(--ok); background:#f9fafb; } .chip.met { color:var(--met); background:#ecfdf3; }
+  .why { color:var(--muted); font-size:12px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  textarea { width:100%; min-height:190px; font:12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; border:1px solid var(--line); border-radius:6px; padding:8px; }
+  blockquote { margin:4px 0 0; padding-left:10px; border-left:3px solid var(--line); color:var(--muted); font-size:12.5px; }
+  .rule { margin-bottom:12px; }
+  .err { color:var(--overdue); font-size:12px; min-height:1em; }
+  footer { color:var(--muted); font-size:12px; }
+  .toggle { flex-direction:row; align-items:center; gap:6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>IEP timeline check: California</h1>
+  <p class="sub">Paste a caseload and a school calendar. It lists what is overdue, what falls due in the next 30 days, and the service minutes the IEPs promised but the logs do not show. Everything runs in this page; nothing is uploaded.</p>
+</header>
+<main>
+  <div class="controls">
+    <label>As of <input type="date" id="asOf"></label>
+    <label>Count minutes from <input type="date" id="periodStart"></label>
+    <label class="toggle"><input type="checkbox" id="showMet"> show met deadlines</label>
+    <button id="export">Export deadlines CSV</button>
+    <button id="reset">Reset to sample data</button>
+  </div>
+
+  <div class="tiles">
+    <div class="tile"><div class="n" id="tOverdue" style="color:var(--overdue)">0</div><div class="k">deadlines overdue</div></div>
+    <div class="tile"><div class="n" id="tSoon" style="color:var(--soon)">0</div><div class="k">due in the next 30 days</div></div>
+    <div class="tile"><div class="n" id="tLate" style="color:var(--late)">0</div><div class="k">met after the deadline</div></div>
+    <div class="tile"><div class="n" id="tMinutes">0</div><div class="k" id="tMinutesK">service minutes short</div></div>
+  </div>
+
+  <section class="card">
+    <h2>Deadlines, most urgent first</h2>
+    <table id="deadlines"><thead><tr><th>Status</th><th>Student</th><th>Case manager</th><th>Deadline</th><th>Due</th><th class="num">Days left</th><th>Done on</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="card">
+    <h2>Service minutes since <span id="pStart"></span></h2>
+    <table id="minutes"><thead><tr><th>Student</th><th class="num">IEP minutes / week</th><th class="num">School days</th><th class="num">Owed</th><th class="num">Logged</th><th class="num">Short</th></tr></thead><tbody></tbody></table>
+    <p class="why">Owed = weekly minutes × school days ÷ 5, counted from this date or the student's IEP date if later, skipping weekends and every break in the calendar below. A shortfall is where compensatory-services questions start.</p>
+  </section>
+
+  <section class="grid2">
+    <div class="card">
+      <h2>Caseload (CSV)</h2>
+      <textarea id="caseload" spellcheck="false"></textarea>
+      <div class="err" id="caseErr"></div>
+    </div>
+    <div class="card">
+      <h2>School calendar breaks (CSV)</h2>
+      <textarea id="calendar" spellcheck="false"></textarea>
+      <div class="why" id="calNote"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>The rules it applies</h2>
+    <div id="rules"></div>
+  </section>
+
+  <footer>
+    <p>A prototype, not legal advice. Not handled yet: written extensions the parent agreed to; the 30-day meeting after an eligibility determination (§ 56043(f)(2)); transfers in (§ 56043(m)); and Medi-Cal billing documentation. Due dates count the days after the start date; check them against your district's practice.</p>
+  </footer>
+</main>
+<script>// IEP timeline rules for a California caseload. Pure functions, no DOM.
+// Dates are 'YYYY-MM-DD' strings in and out; arithmetic is in UTC days.
+(function (root) {
+  'use strict';
+  const DAY = 86400000;
+
+  function parse(s) {
+    if (!s) return null;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s).trim());
+    if (!m) return null;
+    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    return d.getUTCMonth() === +m[2] - 1 ? d : null;
+  }
+  function fmt(d) { return d.toISOString().slice(0, 10); }
+  function addDays(d, n) { return new Date(d.getTime() + n * DAY); }
+  function diffDays(a, b) { return Math.round((b - a) / DAY); }
+  function isWeekday(d) { const w = d.getUTCDay(); return w !== 0 && w !== 6; }
+
+  // Same month and day n years on; Feb 29 falls back to Feb 28.
+  function addYears(d, n) {
+    const y = d.getUTCFullYear() + n, m = d.getUTCMonth(), day = d.getUTCDate();
+    const out = new Date(Date.UTC(y, m, day));
+    return out.getUTCMonth() === m ? out : new Date(Date.UTC(y, m + 1, 0));
+  }
+
+  // Breaks are {start, end, label, betweenSessions}. 56043(a), (f)(1) and (l) do not
+  // count days between regular sessions or terms, or days of a vacation "in
+  // excess of five schooldays"; a shorter break counts like any other day.
+  function weekdaysIn(start, end) {
+    let n = 0;
+    for (let d = start; d <= end; d = addDays(d, 1)) if (isWeekday(d)) n++;
+    return n;
+  }
+  function excludedDays(breaks) {
+    const out = new Set();
+    for (const b of breaks || []) {
+      const s = parse(b.start), e = parse(b.end);
+      if (!s || !e || e < s) continue;
+      if (!b.betweenSessions && weekdaysIn(s, e) <= 5) continue;
+      for (let d = s; d <= e; d = addDays(d, 1)) out.add(fmt(d));
+    }
+    return out;
+  }
+  // Every day of every break, short or long: no sessions are delivered on them.
+  function closedDays(breaks) {
+    const out = new Set();
+    for (const b of breaks || []) {
+      const s = parse(b.start), e = parse(b.end);
+      if (!s || !e || e < s) continue;
+      for (let d = s; d <= e; d = addDays(d, 1)) out.add(fmt(d));
+    }
+    return out;
+  }
+  function num(v) {
+    const t = String(v == null ? '' : v).replace(/,/g, '').trim();
+    return t === '' ? 0 : Number(t);
+  }
+  // The day on which n countable days have passed since start (start itself not counted).
+  function countForward(start, n, excluded) {
+    let d = start, counted = 0;
+    while (counted < n) {
+      d = addDays(d, 1);
+      if (!excluded || !excluded.has(fmt(d))) counted++;
+    }
+    return d;
+  }
+
+  const RULES = [
+    {
+      id: 'plan', label: 'Assessment plan to parent', days: 15, from: 'referral', done: 'planSent',
+      cite: 'Cal. Educ. Code § 56043(a)',
+      quote: 'A proposed assessment plan shall be developed within 15 calendar days of referral for assessment, not counting calendar days between the pupil’s regular school sessions or terms or calendar days of school vacation in excess of five schooldays, from the date of receipt of the referral, unless the parent or guardian agrees in writing to an extension',
+      url: 'https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=EDC&sectionNum=56043',
+    },
+    {
+      id: 'initial', label: 'Initial IEP developed', days: 60, from: 'consent', done: 'initialIep',
+      cite: 'Cal. Educ. Code § 56043(f)(1); 34 CFR § 300.301(c)',
+      quote: 'An individualized education program required as a result of an assessment of a pupil shall be developed within a total time not to exceed 60 calendar days, not counting days between the pupil’s regular school sessions, terms, or days of school vacation in excess of five schooldays, from the date of receipt of the parent’s or guardian’s written consent for assessment',
+      url: 'https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=EDC&sectionNum=56043',
+    },
+    {
+      id: 'request', label: 'Meeting the parent asked for', days: 30, from: 'parentRequest', done: 'requestMeeting',
+      cite: 'Cal. Educ. Code § 56043(l)',
+      quote: 'A meeting of an individualized education program team requested by a parent or guardian to review an individualized education program pursuant to subdivision (c) of Section 56343 shall be held within 30 calendar days, not counting days between the pupil’s regular school sessions, terms, or days of school vacation in excess of five schooldays, from the date of receipt of the parent’s or guardian’s written request',
+      url: 'https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=EDC&sectionNum=56043',
+    },
+    {
+      id: 'annual', label: 'Annual IEP review', years: 1, from: 'lastIep', fallback: 'initialIep',
+      cite: 'Cal. Educ. Code § 56043(d), (j); 34 CFR § 300.324(b)(1)',
+      quote: 'An individualized education program team shall meet at least annually to review a pupil’s progress, the individualized education program, including whether the annual goals for the pupil are being achieved',
+      url: 'https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=EDC&sectionNum=56043',
+    },
+    {
+      id: 'triennial', label: 'Triennial reassessment', years: 3, from: 'lastTriennial', fallback: 'initialIep',
+      cite: 'Cal. Educ. Code § 56043(k); 34 CFR § 300.303(b)(2)',
+      quote: 'shall occur at least once every three years, unless the parent and the local educational agency agree, in writing, that a reassessment is unnecessary',
+      url: 'https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=EDC&sectionNum=56043',
+    },
+  ];
+
+  const SOON_DAYS = 30;
+
+  function status(due, asOf, doneOn) {
+    if (doneOn) return doneOn <= due ? 'met' : 'late';
+    const left = diffDays(asOf, due);
+    if (left < 0) return 'overdue';
+    if (left <= SOON_DAYS) return 'soon';
+    return 'ok';
+  }
+
+  // Minutes the IEP promised on school days since the later of periodStart and the
+  // current IEP's date, against minutes logged. closed = closedDays(breaks).
+  function minutes(student, periodStart, asOf, closed) {
+    const perWeek = num(student.minutesPerWeek);
+    let start = parse(periodStart);
+    const iep = parse(student.lastIep) || parse(student.initialIep);
+    if (iep && start && iep > start) start = iep;
+    if (!perWeek || !start || asOf < start) return null;
+    let schoolDays = 0;
+    for (let d = start; d <= asOf; d = addDays(d, 1))
+      if (isWeekday(d) && !closed.has(fmt(d))) schoolDays++;
+    const required = Math.round(perWeek * schoolDays / 5);
+    const delivered = num(student.minutesDelivered) || 0;
+    return { required, delivered, shortfall: Math.max(0, required - delivered), schoolDays, from: fmt(start) };
+  }
+
+  function evaluateStudent(student, ctx) {
+    const asOf = parse(ctx.asOf);
+    const excluded = excludedDays(ctx.breaks);
+    const items = [];
+    for (const r of RULES) {
+      const from = parse(student[r.from]) || (r.fallback ? parse(student[r.fallback]) : null);
+      if (!from) continue;
+      // The initial-IEP clock stops mattering once an annual cycle has started;
+      // annual and triennial count from the initial IEP until a later date is entered.
+      if (r.id === 'initial' && parse(student.lastIep) && !student.initialIep) continue;
+      if (r.id === 'plan' && parse(student.consent) && !student.planSent) continue;
+      const due = r.years ? addYears(from, r.years) : countForward(from, r.days, excluded);
+      const doneOn = r.done ? parse(student[r.done]) : null;
+      items.push({
+        rule: r.id, label: r.label, due: fmt(due), daysLeft: diffDays(asOf, due),
+        status: status(due, asOf, doneOn), doneOn: doneOn ? fmt(doneOn) : '',
+      });
+    }
+    return { id: student.id, items, minutes: minutes(student, ctx.periodStart, asOf, closedDays(ctx.breaks)) };
+  }
+
+  const RANK = { overdue: 0, late: 1, soon: 2, ok: 3, met: 4 };
+  function evaluateCaseload(students, ctx) {
+    const rows = [];
+    for (const s of students) {
+      const ev = evaluateStudent(s, ctx);
+      for (const it of ev.items) rows.push(Object.assign({ id: s.id, case: s.caseManager || '' }, it));
+    }
+    rows.sort((a, b) => RANK[a.status] - RANK[b.status] || a.daysLeft - b.daysLeft || a.id.localeCompare(b.id));
+    return rows;
+  }
+
+  // Minimal CSV: header row, comma separated, double quotes for fields with commas or
+  // newlines. Lines starting with # are comments.
+  function parseCsv(text) {
+    const recs = []; let rec = [], cur = '', q = false;
+    const src = String(text).replace(/\r\n?/g, '\n') + '\n';
+    for (let i = 0; i < src.length; i++) {
+      const c = src[i];
+      if (q) { if (c === '"' && src[i + 1] === '"') { cur += '"'; i++; } else if (c === '"') q = false; else cur += c; }
+      else if (c === '"') q = true;
+      else if (c === ',') { rec.push(cur.trim()); cur = ''; }
+      else if (c === '\n') { rec.push(cur.trim()); cur = ''; recs.push(rec); rec = []; }
+      else cur += c;
+    }
+    const rows = recs.filter(r => r.some(v => v) && !r[0].startsWith('#'));
+    if (!rows.length) return [];
+    const head = rows[0];
+    return rows.slice(1).map(v => { const o = {}; head.forEach((h, i) => o[h] = v[i] || ''); return o; });
+  }
+  function toCsv(rows, cols) {
+    const esc = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    return [cols.join(',')].concat(rows.map(r => cols.map(c => esc(r[c])).join(','))).join('\n') + '\n';
+  }
+  function parseBreaks(text) {
+    return parseCsv(text).map(r => ({ start: r.start, end: r.end, label: r.label, betweenSessions: /^(y|yes|true|1)$/i.test(r.betweenSessions || '') }));
+  }
+
+  const api = { parse, fmt, addDays, addYears, weekdaysIn, excludedDays, closedDays, num, countForward, status, minutes,
+    evaluateStudent, evaluateCaseload, parseCsv, toCsv, parseBreaks, RULES, SOON_DAYS };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.SpedRules = api;
+})(this);
+</script>
+<script>
+(function () {
+  'use strict';
+  const R = window.SpedRules;
+  const SAMPLE_CASELOAD = "# Fictional students. Dates are YYYY-MM-DD; leave a field empty if it does not apply.\nid,grade,caseManager,referral,planSent,consent,initialIep,lastIep,lastTriennial,minutesPerWeek,minutesDelivered,parentRequest,requestMeeting\nS-101,3,Rivera,2026-10-08,,,,,,,,,\nS-102,K,Rivera,2026-09-14,2026-09-25,2026-10-02,,,,,,,\nS-103,6,Chen,2026-08-20,2026-09-02,2026-09-09,,,,,,,\nS-104,4,Chen,,,,,2025-10-30,2024-11-12,120,900,2026-10-05,\nS-105,8,Rivera,,,,,2025-11-03,2023-11-03,90,780,,\nS-106,2,Okafor,,,,,2026-02-17,2024-02-29,60,560,,\nS-107,5,Okafor,,,,,2025-10-14,2025-10-14,150,1100,,\nS-108,7,Chen,2026-09-01,2026-09-22,2026-09-28,,,,,,,\nS-109,1,Okafor,,,,,2026-05-20,2023-12-01,200,1920,2026-09-08,2026-09-24\nS-110,11,Rivera,2026-06-01,2026-06-10,2026-06-12,2026-09-30,,,,,,\n";
+  const SAMPLE_CALENDAR = "# An illustrative 2026-27 calendar, not a real district's. betweenSessions=yes marks summer.\nstart,end,label,betweenSessions\n2026-06-05,2026-08-14,Summer 2026,yes\n2026-11-23,2026-11-27,Thanksgiving week,\n2026-12-21,2027-01-01,Winter break,\n2027-02-15,2027-02-19,February break,\n2027-03-29,2027-04-02,Spring break,\n2027-06-04,2027-08-13,Summer 2027,yes\n";
+  const $ = id => document.getElementById(id);
+  const store = window.localStorage;
+  const params = new URLSearchParams(location.search);
+  const now = new Date(), pad = n => String(n).padStart(2, '0');
+  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+  $('asOf').value = params.get('asof') || today;
+  $('periodStart').value = params.get('from') || (store && store.getItem('sped.periodStart')) || '2026-08-17';
+  $('caseload').value = (!params.get('asof') && store && store.getItem('sped.caseload')) || SAMPLE_CASELOAD;
+  $('calendar').value = (!params.get('asof') && store && store.getItem('sped.calendar')) || SAMPLE_CALENDAR;
+
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let lastRows = [];
+
+  function render() {
+    const students = R.parseCsv($('caseload').value);
+    const breaks = R.parseBreaks($('calendar').value);
+    const ctx = { asOf: $('asOf').value || today, periodStart: $('periodStart').value, breaks };
+    const missing = students.filter(s => !s.id).length;
+    const badDates = [];
+    for (const s of students) for (const k of ['referral', 'planSent', 'consent', 'initialIep', 'lastIep', 'lastTriennial', 'parentRequest', 'requestMeeting'])
+      if (s[k] && !R.parse(s[k])) badDates.push(`${s.id || '?'}.${k}="${s[k]}"`);
+    for (const s of students) for (const k of ['minutesPerWeek', 'minutesDelivered'])
+      if (s[k] && !Number.isFinite(R.num(s[k]))) badDates.push(`${s.id || '?'}.${k}="${s[k]}" (not a number)`);
+    $('caseErr').textContent = (missing ? missing + ' row(s) without an id. ' : '') + (badDates.length ? 'Check: ' + badDates.join(', ') : '');
+
+    const rows = R.evaluateCaseload(students.filter(s => s.id), ctx);
+    lastRows = rows;
+    const count = st => rows.filter(r => r.status === st).length;
+    $('tOverdue').textContent = count('overdue');
+    $('tSoon').textContent = count('soon');
+    $('tLate').textContent = count('late');
+
+    const shown = $('showMet').checked ? rows : rows.filter(r => r.status !== 'met');
+    $('deadlines').tBodies[0].innerHTML = shown.map(r => `<tr>
+      <td><span class="chip ${r.status}">${r.status === 'soon' ? 'due soon' : r.status}</span></td>
+      <td>${esc(r.id)}</td><td>${esc(r.case)}</td><td>${esc(r.label)}</td><td>${r.due}</td>
+      <td class="num">${r.doneOn ? '' : r.daysLeft}</td><td>${r.doneOn}</td></tr>`).join('') ||
+      '<tr><td colspan="7" class="why">Nothing to show.</td></tr>';
+
+    const asOf = R.parse(ctx.asOf), closed = R.closedDays(breaks);
+    const mins = students.filter(s => s.id).map(s => ({ id: s.id, perWeek: s.minutesPerWeek, m: R.minutes(s, ctx.periodStart, asOf, closed) })).filter(x => x.m);
+    mins.sort((a, b) => b.m.shortfall - a.m.shortfall);
+    const total = mins.reduce((a, x) => a + x.m.shortfall, 0), short = mins.filter(x => x.m.shortfall > 0).length;
+    $('tMinutes').textContent = total.toLocaleString();
+    $('tMinutesK').textContent = `service minutes short, ${short} of ${mins.length} students`;
+    $('pStart').textContent = ctx.periodStart || '(set a start date)';
+    $('minutes').tBodies[0].innerHTML = mins.map(x => `<tr><td>${esc(x.id)}</td><td class="num">${esc(x.perWeek)}</td>
+      <td class="num">${x.m.schoolDays}</td><td class="num">${x.m.required.toLocaleString()}</td><td class="num">${x.m.delivered.toLocaleString()}</td>
+      <td class="num" style="color:${x.m.shortfall ? 'var(--overdue)' : 'var(--met)'};font-weight:600">${x.m.shortfall.toLocaleString()}</td></tr>`).join('') ||
+      '<tr><td colspan="6" class="why">No student has minutesPerWeek set.</td></tr>';
+
+    const long = breaks.filter(b => R.parse(b.start) && R.parse(b.end) && (b.betweenSessions || R.weekdaysIn(R.parse(b.start), R.parse(b.end)) > 5));
+    $('calNote').textContent = `The 15-, 30- and 60-day clocks skip ${long.length} of ${breaks.length} breaks: ` +
+      long.map(b => b.label).join(', ') + '. A break of five schooldays or fewer counts like any other day.';
+
+    if (store && !params.get('asof')) {
+      store.setItem('sped.caseload', $('caseload').value);
+      store.setItem('sped.calendar', $('calendar').value);
+      store.setItem('sped.periodStart', $('periodStart').value);
+    }
+  }
+
+  $('rules').innerHTML = R.RULES.map(r => `<div class="rule"><strong>${esc(r.label)}</strong>:
+    ${r.days ? r.days + ' days from ' + r.from : r.years + ' year' + (r.years > 1 ? 's' : '') + ' from ' + r.from}
+    <span class="why">· <a href="${r.url}" target="_blank" rel="noopener">${esc(r.cite)}</a></span>
+    <blockquote>“${esc(r.quote)}”</blockquote></div>`).join('');
+
+  for (const id of ['asOf', 'periodStart', 'caseload', 'calendar', 'showMet']) $(id).addEventListener('input', render);
+  $('reset').addEventListener('click', () => { $('caseload').value = SAMPLE_CASELOAD; $('calendar').value = SAMPLE_CALENDAR; render(); });
+  $('export').addEventListener('click', () => {
+    const csv = R.toCsv(lastRows, ['id', 'case', 'rule', 'label', 'due', 'daysLeft', 'status', 'doneOn']);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = `iep-deadlines-${$('asOf').value}.csv`; a.click();
+  });
+  render();
+})();
+</script>
+</body>
+</html>
