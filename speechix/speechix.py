@@ -9,6 +9,7 @@ Requirements:
 """
 
 import argparse
+import subprocess
 import sys
 import tempfile
 import wave
@@ -28,6 +29,27 @@ except ImportError:
     sd = None
 
 
+def _convert_with_afconvert_to_wav(path: Path) -> Path:
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tf:
+        converted_path = Path(tf.name)
+
+    try:
+        subprocess.run(
+            ["afconvert", "-f", "WAVE", "-d", "LEI16", str(path), str(converted_path)],
+            check=True,
+            capture_output=True,
+        )
+    except FileNotFoundError as exc:
+        converted_path.unlink(missing_ok=True)
+        raise ValueError("Unsupported AIFF-C compression and afconvert is unavailable") from exc
+    except subprocess.CalledProcessError as exc:
+        converted_path.unlink(missing_ok=True)
+        detail = exc.stderr.decode(errors="replace").strip()
+        raise ValueError(f"Unable to convert TTS output with afconvert: {detail}") from exc
+
+    return converted_path
+
+
 def _load_pcm_from_file(path: Path) -> tuple[np.ndarray, int, int]:
     with path.open("rb") as f:
         magic = f.read(12)
@@ -39,20 +61,29 @@ def _load_pcm_from_file(path: Path) -> tuple[np.ndarray, int, int]:
             sample_rate = wf.getframerate()
             nframes = wf.getnframes()
             raw = wf.readframes(nframes)
+            dtype = "<i2"
     elif magic[0:4] == b"FORM":
-        with aifc.open(str(path), "rb") as af:
-            channels = af.getnchannels()
-            sample_width = af.getsampwidth()
-            sample_rate = af.getframerate()
-            nframes = af.getnframes()
-            raw = af.readframes(nframes)
+        try:
+            with aifc.open(str(path), "rb") as af:
+                channels = af.getnchannels()
+                sample_width = af.getsampwidth()
+                sample_rate = af.getframerate()
+                nframes = af.getnframes()
+                raw = af.readframes(nframes)
+                dtype = ">i2"
+        except aifc.Error:
+            converted_path = _convert_with_afconvert_to_wav(path)
+            try:
+                return _load_pcm_from_file(converted_path)
+            finally:
+                converted_path.unlink(missing_ok=True)
     else:
         raise ValueError("Unsupported TTS output format (expected WAV/AIFF)")
 
     if sample_width != 2:
         raise ValueError(f"Unsupported sample width: {sample_width} bytes")
 
-    data = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+    data = np.frombuffer(raw, dtype=dtype).astype(np.float32) / 32768.0
     if channels > 1:
         data = data.reshape(-1, channels).mean(axis=1)
     return data, sample_rate, channels
@@ -102,6 +133,18 @@ def modulate_am(baseband: np.ndarray, carrier_hz: float, sample_rate: int, depth
     return (y / max(peak, 1e-6)).astype(np.float32)
 
 
+def write_wav(path: Path, samples: np.ndarray, sample_rate: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pcm = np.clip(samples, -1.0, 1.0)
+    pcm = (pcm * 32767.0).astype("<i2")
+
+    with wave.open(str(path), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(pcm.tobytes())
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Play TTS speech modulated onto a selected kHz carrier.")
     parser.add_argument("text", nargs="?", default="Hello from Speechix", help="Text to synthesize")
@@ -110,9 +153,10 @@ def main() -> None:
     parser.add_argument("--amplitude", type=float, default=0.12, help="Output amplitude 0..1 (default: 0.12)")
     parser.add_argument("--depth", type=float, default=0.85, help="AM modulation depth 0..1 (default: 0.85)")
     parser.add_argument("--rate", type=int, default=170, help="TTS speaking rate words/minute (default: 170)")
+    parser.add_argument("--output", type=Path, help="Write the modulated audio to a WAV file instead of playing it")
     args = parser.parse_args()
 
-    if sd is None:
+    if sd is None and args.output is None:
         print("Missing dependency: sounddevice. Install with: pip install sounddevice", file=sys.stderr)
         sys.exit(2)
 
@@ -130,10 +174,20 @@ def main() -> None:
     speech_rs = resample_linear(speech, speech_sr, args.sample_rate)
     modulated = modulate_am(speech_rs, carrier_hz, args.sample_rate, args.depth) * args.amplitude
 
-    print("Warning: high-frequency playback can be uncomfortable. Start at low volume.")
-    print(f"Playing AM-modulated TTS at {args.khz:.2f} kHz carrier.")
-    sd.play(modulated, samplerate=args.sample_rate, blocking=True)
-    sd.stop()
+    if args.output is not None:
+        write_wav(args.output, modulated, args.sample_rate)
+        print(f"Wrote AM-modulated TTS to {args.output}")
+        return
+
+    print("Warning: high-frequency playback can be uncomfortable. Start at low volume.", flush=True)
+    print(f"Playing AM-modulated TTS at {args.khz:.2f} kHz carrier.", flush=True)
+    try:
+        sd.play(modulated, samplerate=args.sample_rate, blocking=True)
+        sd.stop()
+    except sd.PortAudioError as exc:
+        fallback_path = Path("speechix-output.wav")
+        write_wav(fallback_path, modulated, args.sample_rate)
+        print(f"Audio playback failed ({exc}). Wrote output to {fallback_path} instead.", file=sys.stderr)
 
 
 if __name__ == "__main__":
